@@ -125,7 +125,7 @@ export function Viewport() {
       canvas!.addEventListener('gesturestart', (e: Event) => e.preventDefault());
       canvas!.addEventListener('gesturechange', (e: Event) => e.preventDefault());
 
-      // Two-finger scroll → pan, pinch → zoom
+      // Two-finger swipe → orbit, pinch → zoom
       const cam = scene.activeCamera as any;
       canvas!.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
@@ -135,20 +135,13 @@ export function Viewport() {
           const zoomDelta = e.deltaY * 0.01;
           cam.radius = Math.max(
             cam.lowerRadiusLimit ?? 2,
-            Math.min(cam.upperRadiusLimit ?? 100, cam.radius * (1 + zoomDelta)),
+            Math.min(cam.upperRadiusLimit ?? 200, cam.radius * (1 + zoomDelta)),
           );
         } else {
-          // Two-finger swipe → pan (slide camera target in screen space)
-          const panSpeed = cam.radius * 0.002;
-          const vm = cam.getViewMatrix();
-          const rx = vm.m[0], ry = vm.m[1], rz = vm.m[2];
-          const ux = vm.m[4], uy = vm.m[5], uz = vm.m[6];
-
-          const dx = e.deltaX * panSpeed;
-          const dy = e.deltaY * panSpeed;
-          cam.target.x += dx * rx - dy * ux;
-          cam.target.y += dx * ry - dy * uy;
-          cam.target.z += dx * rz - dy * uz;
+          // Two-finger swipe → orbit around target
+          cam.alpha -= e.deltaX * 0.005;
+          cam.beta -= e.deltaY * 0.005;
+          cam.beta = Math.max(0.05, Math.min(Math.PI - 0.05, cam.beta));
         }
       }, { passive: false });
 
