@@ -99,5 +99,27 @@ for (const s of sims) {
   insertSim.run(s.id, s.user_id, s.name, s.slug, s.description, s.category, s.version, s.plays, s.rating_sum, s.rating_count, s.source_code);
 }
 
+// Add tags
+const tagMap: Record<string, string[]> = {
+  'eduvision-digital-logic': ['circuits', 'logic-gates', 'boolean-algebra', 'digital', 'education'],
+  'pendulum-physics': ['physics', 'pendulum', 'gravity', 'energy', 'AP Physics'],
+  'gear-train-sim': ['engineering', 'gears', 'torque', 'mechanical', 'mechanisms'],
+  'water-molecule': ['chemistry', 'molecules', 'bonds', 'H2O', 'molecular'],
+  'binary-adder': ['circuits', 'binary', 'adder', 'digital', 'computer-architecture'],
+  'projectile-motion': ['physics', 'projectile', 'kinematics', 'AP Physics', 'trajectory'],
+  'sorting-race': ['cs', 'algorithms', 'sorting', 'visualization', 'data-structures'],
+  'spring-mass': ['physics', 'springs', 'hooke-law', 'oscillation', 'SHM'],
+  'combustion-engine': ['engineering', 'thermodynamics', 'engine', 'mechanical', 'four-stroke'],
+  'fourier-transform': ['math', 'fourier', 'signals', 'waves', 'harmonics'],
+};
+
+const insertTag = db.prepare(`INSERT OR IGNORE INTO simulation_tags (simulation_id, tag) VALUES (?, ?)`);
+for (const s of sims) {
+  const tags = tagMap[s.slug] ?? [s.category];
+  for (const tag of tags) {
+    insertTag.run(s.id, tag);
+  }
+}
+
 db.close();
 console.log(`Seeded ${users.length} users and ${sims.length} simulations.`);

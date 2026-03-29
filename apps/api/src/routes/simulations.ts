@@ -298,6 +298,45 @@ simulationsRouter.get('/:slug/reviews', (c) => {
   return c.json({ reviews });
 });
 
+// GET /simulations/meta/tags — all tags with counts
+simulationsRouter.get('/meta/tags', (c) => {
+  const db = getDb();
+  const tags = db.prepare(`
+    SELECT tag, COUNT(*) as count FROM simulation_tags GROUP BY tag ORDER BY count DESC
+  `).all();
+  db.close();
+  return c.json({ tags });
+});
+
+// GET /simulations/meta/search-suggestions — autocomplete
+simulationsRouter.get('/meta/suggestions', (c) => {
+  const q = c.req.query('q');
+  if (!q || q.length < 2) return c.json({ suggestions: [] });
+
+  const db = getDb();
+
+  // Search sim names
+  const sims = db.prepare(`
+    SELECT name, slug, category FROM simulations
+    WHERE name LIKE ? AND status = 'published'
+    LIMIT 5
+  `).all(`%${q}%`) as any[];
+
+  // Search tags
+  const tags = db.prepare(`
+    SELECT DISTINCT tag FROM simulation_tags WHERE tag LIKE ? LIMIT 5
+  `).all(`%${q}%`) as any[];
+
+  db.close();
+
+  return c.json({
+    suggestions: [
+      ...sims.map((s: any) => ({ type: 'simulation', text: s.name, slug: s.slug, category: s.category })),
+      ...tags.map((t: any) => ({ type: 'tag', text: t.tag })),
+    ],
+  });
+});
+
 // POST /simulations — publish a new simulation
 simulationsRouter.post('/', async (c) => {
   const body = await c.req.json();

@@ -100,6 +100,14 @@ export function initDb(): void {
       processed_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS simulation_tags (
+      simulation_id TEXT NOT NULL REFERENCES simulations(id),
+      tag TEXT NOT NULL,
+      PRIMARY KEY(simulation_id, tag)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tags_tag ON simulation_tags(tag);
+
     CREATE TABLE IF NOT EXISTS favorites (
       user_id TEXT NOT NULL REFERENCES users(id),
       simulation_id TEXT NOT NULL REFERENCES simulations(id),
