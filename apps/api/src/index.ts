@@ -20,9 +20,15 @@ if (count === 0) {
   await import('./db/seed.js');
 }
 
+import { rateLimiter, securityHeaders } from './middleware/security.js';
+
 const app = new Hono();
 
-// CORS for frontend apps
+// Security
+app.use('*', securityHeaders);
+app.use('/api/*', rateLimiter);
+
+// CORS
 app.use('*', cors({
   origin: ['http://localhost:4000', 'http://localhost:4001', 'http://localhost:3000', 'https://marketplace-sigma-ebon.vercel.app'],
   credentials: true,
