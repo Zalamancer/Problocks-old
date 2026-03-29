@@ -120,11 +120,22 @@ simulationsRouter.post('/:slug/fork', async (c) => {
   return c.json({ id, slug: forkSlug, name: forkName, forked_from: slug }, 201);
 });
 
-// POST /simulations/:slug/play — increment play count
+// POST /simulations/:slug/play — increment play count + earn Probux for creator
 simulationsRouter.post('/:slug/play', (c) => {
   const db = getDb();
   const slug = c.req.param('slug');
+
+  const sim: any = db.prepare(`SELECT user_id FROM simulations WHERE slug = ?`).get(slug);
   db.prepare(`UPDATE simulations SET plays = plays + 1 WHERE slug = ?`).run(slug);
+
+  // Credit 1 Probux to the creator
+  if (sim) {
+    db.prepare(`INSERT OR IGNORE INTO wallets (user_id) VALUES (?)`).run(sim.user_id);
+    db.prepare(`UPDATE wallets SET balance = balance + 1, total_earned = total_earned + 1, updated_at = datetime('now') WHERE user_id = ?`).run(sim.user_id);
+    db.prepare(`INSERT INTO transactions (id, user_id, type, amount, description, simulation_id) VALUES (?, ?, 'play_earning', 1, 'Play earning', ?)`)
+      .run(nanoid(), sim.user_id, slug);
+  }
+
   db.close();
   return c.json({ ok: true });
 });

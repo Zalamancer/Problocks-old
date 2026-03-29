@@ -72,6 +72,34 @@ export function initDb(): void {
       UNIQUE(simulation_id, user_id)
     );
 
+    CREATE TABLE IF NOT EXISTS wallets (
+      user_id TEXT PRIMARY KEY REFERENCES users(id),
+      balance INTEGER DEFAULT 0,
+      total_earned INTEGER DEFAULT 0,
+      total_spent INTEGER DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS transactions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      type TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      description TEXT DEFAULT '',
+      simulation_id TEXT REFERENCES simulations(id),
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS payout_requests (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      amount INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      stripe_payout_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      processed_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS favorites (
       user_id TEXT NOT NULL REFERENCES users(id),
       simulation_id TEXT NOT NULL REFERENCES simulations(id),

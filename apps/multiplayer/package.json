@@ -1,0 +1,20 @@
+{
+  "name": "@problocks/multiplayer",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Problocks multiplayer WebSocket server — real-time collaborative simulations",
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx/esm src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "nanoid": "^5.1.5"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.7.0"
+  }
+}

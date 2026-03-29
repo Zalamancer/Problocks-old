@@ -185,17 +185,18 @@
   },
   "active": "41dc0e8cbcb2c92c",
   "lastOpenFiles": [
-    "packages/mechanics/src/system.ts",
-    "packages/mechanics/src/motor.ts",
-    "packages/mechanics/src/linkage.ts",
-    "packages/mechanics/src/spring.ts",
-    "packages/mechanics/src/gear.ts",
-    "packages/mechanics/src/index.ts",
-    "packages/mechanics/tsconfig.json",
-    "packages/mechanics/package.json",
-    "packages/mechanics/src",
-    "packages/mechanics",
-    "apps/marketplace/dist/assets/babylon-renderer-CytzkrTz.js",
+    "node_modules/ws/lib",
+    "node_modules/ws",
+    "node_modules/lightningcss-win32-x64-msvc",
+    "node_modules/lightningcss-win32-arm64-msvc",
+    "node_modules/lightningcss-linux-x64-musl",
+    "node_modules/lightningcss-linux-x64-gnu",
+    "node_modules/lightningcss-linux-arm64-musl",
+    "node_modules/lightningcss-linux-arm64-gnu",
+    "node_modules/lightningcss-linux-arm-gnueabihf",
+    "node_modules/lightningcss-freebsd-x64",
+    "node_modules/lightningcss-darwin-x64",
+    "node_modules/ws/README.md",
     "docs/plans/002-next-features-roadmap.md",
     "node_modules/react-router/node_modules/cookie/README.md",
     "node_modules/react-router/README.md",
@@ -219,7 +220,6 @@
     "node_modules/lodash.includes/README.md",
     "node_modules/bindings/LICENSE.md",
     "node_modules/file-uri-to-path/README.md",
-    "node_modules/jsonwebtoken/node_modules/semver/README.md",
-    "node_modules/jsonwebtoken/README.md"
+    "node_modules/jsonwebtoken/node_modules/semver/README.md"
   ]
 }
