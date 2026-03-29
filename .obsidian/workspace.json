@@ -185,6 +185,7 @@
   },
   "active": "41dc0e8cbcb2c92c",
   "lastOpenFiles": [
+    "apps/api/data/problocks.db-wal",
     "apps/marketplace/dist/index.html",
     "apps/marketplace/dist/assets/volumetricLightingRenderVolume.vertex-CT_TBzsR.js",
     "apps/marketplace/dist/assets/volumetricLightingRenderVolume.vertex-BDzgbAk9.js",
@@ -195,7 +196,6 @@
     "apps/marketplace/dist/assets/tgaTextureLoader-D63MiChR.js",
     "apps/marketplace/dist/assets/simulation-loop-B9obMI7w.js",
     "apps/marketplace/dist/assets/selectionOutline.fragment-BuLGRxwt.js",
-    "apps/marketplace/dist/assets/selectionOutline.fragment-B8QXT4ok.js",
     "node_modules/react-router/node_modules/cookie/README.md",
     "node_modules/react-router/README.md",
     "node_modules/react-router/LICENSE.md",

@@ -83,6 +83,43 @@ simulationsRouter.get('/:slug', (c) => {
   });
 });
 
+// POST /simulations/:slug/fork — fork a simulation
+simulationsRouter.post('/:slug/fork', async (c) => {
+  const db = getDb();
+  const slug = c.req.param('slug');
+
+  // Get original simulation
+  const original: any = db.prepare(`SELECT * FROM simulations WHERE slug = ?`).get(slug);
+  if (!original) {
+    db.close();
+    return c.json({ error: 'Simulation not found' }, 404);
+  }
+
+  // Get user from auth header (or default to first user for now)
+  const body = await c.req.json().catch(() => ({}));
+  const userId = body.user_id ?? db.prepare(`SELECT id FROM users LIMIT 1`).get()?.id;
+  if (!userId) {
+    db.close();
+    return c.json({ error: 'User required' }, 400);
+  }
+
+  const id = nanoid();
+  const forkSlug = `${slug}-fork-${id.slice(0, 6)}`;
+  const forkName = `${original.name} (Fork)`;
+
+  db.prepare(`
+    INSERT INTO simulations (id, user_id, name, slug, description, category, version, capabilities, source_code, forked_from)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, userId, forkName, forkSlug, original.description, original.category, '1.0.0', original.capabilities, original.source_code, original.id);
+
+  // Increment fork count on original
+  db.prepare(`UPDATE simulations SET fork_count = fork_count + 1 WHERE id = ?`).run(original.id);
+
+  db.close();
+
+  return c.json({ id, slug: forkSlug, name: forkName, forked_from: slug }, 201);
+});
+
 // POST /simulations/:slug/play — increment play count
 simulationsRouter.post('/:slug/play', (c) => {
   const db = getDb();

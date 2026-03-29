@@ -41,6 +41,8 @@ export function initDb(): void {
       thumbnail_url TEXT DEFAULT '',
       entry_file TEXT DEFAULT 'src/index.ts',
       source_code TEXT DEFAULT '',
+      forked_from TEXT REFERENCES simulations(id),
+      fork_count INTEGER DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'published',
       plays INTEGER DEFAULT 0,
       rating_sum REAL DEFAULT 0,
@@ -75,6 +77,40 @@ export function initDb(): void {
       simulation_id TEXT NOT NULL REFERENCES simulations(id),
       created_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY(user_id, simulation_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS classrooms (
+      id TEXT PRIMARY KEY,
+      educator_id TEXT NOT NULL REFERENCES users(id),
+      name TEXT NOT NULL,
+      code TEXT UNIQUE NOT NULL,
+      description TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS classroom_members (
+      classroom_id TEXT NOT NULL REFERENCES classrooms(id),
+      student_id TEXT NOT NULL REFERENCES users(id),
+      joined_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY(classroom_id, student_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS assignments (
+      id TEXT PRIMARY KEY,
+      classroom_id TEXT NOT NULL REFERENCES classrooms(id),
+      simulation_slug TEXT NOT NULL,
+      simulation_version TEXT,
+      title TEXT NOT NULL,
+      due_date TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS assignment_completions (
+      assignment_id TEXT NOT NULL REFERENCES assignments(id),
+      student_id TEXT NOT NULL REFERENCES users(id),
+      completed_at TEXT DEFAULT (datetime('now')),
+      play_count INTEGER DEFAULT 1,
+      PRIMARY KEY(assignment_id, student_id)
     );
 
     CREATE INDEX IF NOT EXISTS idx_simulations_category ON simulations(category);

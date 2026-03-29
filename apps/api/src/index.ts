@@ -5,6 +5,7 @@ import { initDb } from './db/schema.js';
 import { simulationsRouter } from './routes/simulations.js';
 import { authRouter } from './routes/auth.js';
 import { usersRouter } from './routes/users.js';
+import { classroomsRouter } from './routes/classrooms.js';
 
 // Initialize database
 initDb();
@@ -28,6 +29,7 @@ app.get('/', (c) => c.json({
 app.route('/api/auth', authRouter);
 app.route('/api/simulations', simulationsRouter);
 app.route('/api/users', usersRouter);
+app.route('/api/classrooms', classroomsRouter);
 
 // Start server
 const PORT = parseInt(process.env.PORT ?? '5000', 10);

@@ -1,0 +1,17 @@
+{
+  "name": "@problocks/circuits",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Digital logic circuit simulation module for Problocks",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
