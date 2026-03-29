@@ -57,5 +57,9 @@ export type { BrushToolType, BrushControllerConfig } from './editor/terrain-brus
 export { BrushCursor } from './rendering/brush-cursor.js';
 export type { CursorMode } from './rendering/brush-cursor.js';
 
+// Heightmap & Colormap Import (Phase 5)
+export { loadImage, parseHeightmap, parseColormap, importTerrain } from './generation/heightmap-importer.js';
+export type { ImportRegion } from './generation/heightmap-importer.js';
+
 // Legacy noise (still used by generation)
 export { generateHeightmap, fbm, setNoiseSeed } from './noise.js';

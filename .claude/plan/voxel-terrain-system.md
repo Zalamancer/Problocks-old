@@ -411,35 +411,35 @@ Replace the current heightmap-based terrain (`TerrainComponent` + `noise.ts` + `
 ### 5.1 Image Loading
 **File**: `packages/engine/src/terrain/generation/heightmap-importer.ts`
 
-- [ ] `loadImage(file: File): Promise<ImageData>` — via OffscreenCanvas
-- [ ] Validate: PNG or JPG, max 4096x4096
-- [ ] Error message for invalid formats/sizes
+- [x] `loadImage(file: File): Promise<ImageData>` — via OffscreenCanvas
+- [x] Validate: PNG or JPG, max 4096x4096
+- [x] Error message for invalid formats/sizes
 
 ### 5.2 Heightmap Parser
-- [ ] `parseHeightmap(imageData, region): Float32Array`
-- [ ] Grayscale luminance: `(r + g + b) / 3 / 255` → normalized 0–1
-- [ ] Map to region Y range: `minY + normalized * sizeY`
+- [x] `parseHeightmap(imageData, region): Float32Array`
+- [x] Grayscale luminance: `(r + g + b) / 3 / 255` → normalized 0–1
+- [x] Map to region Y range: `minY + normalized * sizeY`
 
 ### 5.3 Colormap Parser
-- [ ] `parseColormap(imageData): Uint8Array` — material ID per pixel
-- [ ] Nearest-match by Euclidean RGB distance to `MATERIAL_DEFS` colors
-- [ ] Full color key table with exact RGB values for all 23 materials
+- [x] `parseColormap(imageData): Uint8Array` — material ID per pixel
+- [x] Nearest-match by Euclidean RGB distance to `MATERIAL_DEFS` colors
+- [x] Full color key table with exact RGB values for all 23 materials
 
 ### 5.4 Grid Fill
-- [ ] `importTerrain(grid, heightmap, materialMap, imageWidth, imageHeight, region, defaultMaterial): void`
-- [ ] For each pixel: fill voxels from region bottom to heightmap Y
-- [ ] Smooth occupancy gradient at surface (last voxel before air)
-- [ ] Use colormap material or default material
+- [x] `importTerrain(grid, heightmap, materialMap, imageWidth, imageHeight, region, defaultMaterial): void`
+- [x] For each pixel: fill voxels from region bottom to heightmap Y
+- [x] Smooth occupancy gradient at surface (last voxel before air)
+- [x] Use colormap material or default material
 
 ### 5.5 Import UI
 **File**: `apps/web-studio/src/components/studio/terrain-editor/HeightmapUploader.tsx`
 
-- [ ] Drag-and-drop zone for heightmap image
-- [ ] Material source toggle: "Single Material" (picker) vs "Colormap" (second drop zone)
-- [ ] Region controls (position X/Y/Z, size X/Y/Z)
-- [ ] Heightmap thumbnail preview with pixel count → world size display
-- [ ] "Generate" button
-- [ ] Wire into CreateTab alongside Generate tool
+- [x] Drag-and-drop zone for heightmap image
+- [x] Material source toggle: "Single Material" (picker) vs "Colormap" (second drop zone)
+- [x] Region controls (position X/Y/Z, size X/Y/Z)
+- [x] Heightmap thumbnail preview with pixel count → world size display
+- [x] "Import Heightmap" button
+- [x] Wire into CreateTab alongside Generate tool (Generate/Import sub-toggle)
 
 **MILESTONE**: Drop a heightmap PNG → terrain matching the image appears in the viewport.
 

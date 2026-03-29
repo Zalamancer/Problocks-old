@@ -49,10 +49,14 @@ export {
   iterateBrushVoxels, defaultBrushConfig,
   applyDraw, applySculpt, applySmooth, applyFlatten, applyPaint,
   TerrainUndoStack, TerrainBrushController, BrushCursor,
+  // Heightmap Import (Phase 5)
+  loadImage, parseHeightmap, parseColormap, importTerrain,
 } from './terrain/index.js';
 export type {
   Voxel, ChunkMeshData, ChunkMeshResult, TerrainRaycastHit,
   // Editor types (Phase 4)
   BrushShape, BrushPivot, BrushConfig, BrushVoxel,
   FlattenMode, TerrainUndoEntry, BrushToolType, BrushControllerConfig, CursorMode,
+  // Heightmap Import types (Phase 5)
+  ImportRegion,
 } from './terrain/index.js';

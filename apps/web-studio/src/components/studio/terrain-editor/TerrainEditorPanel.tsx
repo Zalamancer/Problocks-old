@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 import { BiomeSettings } from './BiomeSettings';
 import { EditTab, defaultEditTabState } from './EditTab';
 import type { EditTabState } from './EditTab';
+import { HeightmapUploader, defaultHeightmapState } from './HeightmapUploader';
+import type { HeightmapUploaderState } from './HeightmapUploader';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -71,6 +73,7 @@ function NumberField({
 
 export function TerrainEditorPanel() {
   const [activeTab, setActiveTab] = useState<'create' | 'edit'>('create');
+  const [createMode, setCreateMode] = useState<'generate' | 'import'>('generate');
 
   // Biome selection — defaults: Hills + Plains
   const [selectedBiomes, setSelectedBiomes] = useState<Set<string>>(
@@ -97,6 +100,11 @@ export function TerrainEditorPanel() {
 
   // Edit tab state
   const [editState, setEditState] = useState<EditTabState>(defaultEditTabState);
+
+  // Heightmap import state
+  const [heightmapState, setHeightmapState] = useState<HeightmapUploaderState>(defaultHeightmapState);
+  const [importingHeightmap, setImportingHeightmap] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -143,6 +151,26 @@ export function TerrainEditorPanel() {
     updateSetting('seed', Math.floor(Math.random() * 100000));
   }, [updateSetting]);
 
+  const handleImportHeightmap = useCallback(() => {
+    console.log('Import heightmap', heightmapState);
+    setImportingHeightmap(true);
+    setImportProgress(0);
+
+    let p = 0;
+    const interval = setInterval(() => {
+      p += 0.05 + Math.random() * 0.1;
+      if (p >= 1) {
+        p = 1;
+        clearInterval(interval);
+        setTimeout(() => {
+          setImportingHeightmap(false);
+          setImportProgress(0);
+        }, 300);
+      }
+      setImportProgress(p);
+    }, 120);
+  }, [heightmapState]);
+
   return (
     <div className="h-full flex flex-col bg-zinc-900/80 backdrop-blur-xl border border-white/[0.06] rounded-xl overflow-hidden">
       {/* Tab bar */}
@@ -175,6 +203,44 @@ export function TerrainEditorPanel() {
       <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
         {activeTab === 'create' && (
           <>
+            {/* ── Create mode toggle ─────────────────────── */}
+            <div className="flex items-center gap-1 bg-zinc-800/60 rounded-lg p-0.5">
+              <button
+                onClick={() => setCreateMode('generate')}
+                className={cn(
+                  'flex-1 text-[11px] py-1.5 rounded-md transition-colors',
+                  createMode === 'generate'
+                    ? 'bg-zinc-700 text-zinc-100'
+                    : 'text-zinc-400 hover:text-zinc-200',
+                )}
+              >
+                Generate
+              </button>
+              <button
+                onClick={() => setCreateMode('import')}
+                className={cn(
+                  'flex-1 text-[11px] py-1.5 rounded-md transition-colors',
+                  createMode === 'import'
+                    ? 'bg-zinc-700 text-zinc-100'
+                    : 'text-zinc-400 hover:text-zinc-200',
+                )}
+              >
+                Import
+              </button>
+            </div>
+
+            {createMode === 'import' && (
+              <HeightmapUploader
+                state={heightmapState}
+                onChange={setHeightmapState}
+                onImport={handleImportHeightmap}
+                importing={importingHeightmap}
+                progress={importProgress}
+              />
+            )}
+
+            {createMode === 'generate' && (
+            <>
             {/* ── Biomes ─────────────────────────────────── */}
             <div>
               <SectionHeader>Biomes</SectionHeader>
@@ -379,6 +445,8 @@ export function TerrainEditorPanel() {
             >
               {generating ? 'Generating...' : 'Generate Terrain'}
             </button>
+            </>
+            )}
           </>
         )}
 
