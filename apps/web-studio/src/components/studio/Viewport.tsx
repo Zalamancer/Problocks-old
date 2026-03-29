@@ -95,7 +95,10 @@ export function Viewport() {
           canvas!.style.cursor = 'pointer';
         } else {
           setHoveredEntity(null);
-          canvas!.style.cursor = 'default';
+          // Don't reset cursor if gizmo is setting it (grab/grabbing)
+          if (canvas!.style.cursor === 'pointer') {
+            canvas!.style.cursor = 'default';
+          }
         }
       };
 
