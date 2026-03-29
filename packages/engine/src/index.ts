@@ -30,11 +30,29 @@ export { QuickJSRuntime } from './scripting/quickjs-runtime.js';
 
 // Components
 export { TransformComponent, MeshComponent, RigidBodyComponent } from './core/component.js';
-export { TerrainComponent, WaterComponent } from './core/component.js';
+export { TerrainComponent, WaterComponent, VoxelTerrainComponent } from './core/component.js';
 export type { TerrainLayer } from './core/component.js';
 
 // Water simulation
 export { WaterSimulation } from './renderer/water-simulation.js';
 
-// Terrain generation
+// Terrain generation (legacy heightmap)
 export { generateHeightmap, fbm, setNoiseSeed } from './terrain/noise.js';
+
+// Voxel terrain system
+export {
+  VoxelGrid, Chunk, ChunkManager, ChunkMesher, ChunkRenderer,
+  TerrainMaterial, MATERIAL_DEFS, materialNameToEnum, materialEnumToName,
+  VOXEL_SIZE, CHUNK_SIZE, CHUNK_WORLD_SIZE,
+  TerrainPhysics, ColliderRebuildQueue,
+  // Editor (Phase 4)
+  iterateBrushVoxels, defaultBrushConfig,
+  applyDraw, applySculpt, applySmooth, applyFlatten, applyPaint,
+  TerrainUndoStack, TerrainBrushController, BrushCursor,
+} from './terrain/index.js';
+export type {
+  Voxel, ChunkMeshData, ChunkMeshResult, TerrainRaycastHit,
+  // Editor types (Phase 4)
+  BrushShape, BrushPivot, BrushConfig, BrushVoxel,
+  FlattenMode, TerrainUndoEntry, BrushToolType, BrushControllerConfig, CursorMode,
+} from './terrain/index.js';
