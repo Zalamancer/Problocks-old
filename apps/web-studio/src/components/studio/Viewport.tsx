@@ -58,6 +58,7 @@ export function Viewport() {
         terrain.noiseScale = t.noiseScale;
         terrain.octaves = t.octaves;
         sim.createTerrain(terrain);
+        lastTerrainKeyRef.current = JSON.stringify(t);
 
         const water = new WaterComponent();
         water.width = t.width;
