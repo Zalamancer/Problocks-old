@@ -26,7 +26,7 @@ program
 program
   .command('init <name>')
   .description('Scaffold a new simulation project')
-  .option('-t, --template <type>', 'Template type: physics, circuits, chemistry, blank', 'physics')
+  .option('-t, --template <type>', 'Template: physics, circuits, chemistry, engineering, biology, math, blank', 'physics')
   .action(initCommand);
 
 program
