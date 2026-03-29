@@ -185,6 +185,7 @@
   },
   "active": "41dc0e8cbcb2c92c",
   "lastOpenFiles": [
+    "docs/plans/003-studio-layout-redesign.md",
     "packages/chemistry/node_modules",
     "packages/chemistry/src/__tests__/chemistry.test.ts",
     "packages/chemistry/src/__tests__",
@@ -195,7 +196,6 @@
     "packages/chemistry/src/bond.ts",
     "packages/chemistry/src/atom.ts",
     "packages/chemistry/src/index.ts",
-    "packages/chemistry/tsconfig.json",
     "README.md",
     "node_modules/@flydotio/dockerfile/node_modules/diff/release-notes.md",
     "node_modules/@flydotio/dockerfile/node_modules/diff/README.md",
