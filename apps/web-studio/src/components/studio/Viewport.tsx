@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useContext, useCallback } from 'react';
 import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
+import { TerrainComponent, WaterComponent } from '@problocks/engine/core/component';
 import { useStudio, StudioContext } from '@/store/studio-store';
 
 /**
@@ -43,6 +44,24 @@ export function Viewport() {
 
       // Register sim with the store so RunScript can access it
       (window as any).__problocks_sim = sim;
+
+      // Create terrain + water
+      const terrain = new TerrainComponent();
+      terrain.width = 100;
+      terrain.depth = 100;
+      terrain.subdivisions = 128;
+      terrain.maxHeight = 10;
+      terrain.seed = 42;
+      terrain.noiseScale = 0.03;
+      sim.createTerrain(terrain);
+
+      const water = new WaterComponent();
+      water.width = 100;
+      water.depth = 100;
+      water.waterLevel = 2.5;
+      water.buoyancy = 9.8;
+      water.waterDrag = 0.8;
+      sim.createWater(water);
 
       // Create all entities from store
       for (const entity of entities) {
@@ -102,7 +121,11 @@ export function Viewport() {
         }
       };
 
-      // Two-finger scroll → orbit in all directions, pinch → zoom
+      // Prevent Safari pinch-to-zoom on canvas only
+      canvas!.addEventListener('gesturestart', (e: Event) => e.preventDefault());
+      canvas!.addEventListener('gesturechange', (e: Event) => e.preventDefault());
+
+      // Two-finger scroll → pan, pinch → zoom
       const cam = scene.activeCamera as any;
       canvas!.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
@@ -115,9 +138,17 @@ export function Viewport() {
             Math.min(cam.upperRadiusLimit ?? 100, cam.radius * (1 + zoomDelta)),
           );
         } else {
-          // Two-finger scroll → orbit camera
-          if (e.deltaX !== 0) cam.alpha += e.deltaX * 0.008;
-          if (e.deltaY !== 0) cam.beta += e.deltaY * 0.008;
+          // Two-finger swipe → pan (slide camera target in screen space)
+          const panSpeed = cam.radius * 0.002;
+          const vm = cam.getViewMatrix();
+          const rx = vm.m[0], ry = vm.m[1], rz = vm.m[2];
+          const ux = vm.m[4], uy = vm.m[5], uz = vm.m[6];
+
+          const dx = e.deltaX * panSpeed;
+          const dy = e.deltaY * panSpeed;
+          cam.target.x += dx * rx - dy * ux;
+          cam.target.y += dx * ry - dy * uy;
+          cam.target.z += dx * rz - dy * uz;
         }
       }, { passive: false });
 
