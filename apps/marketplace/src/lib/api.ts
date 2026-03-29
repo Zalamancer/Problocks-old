@@ -72,3 +72,25 @@ export async function fetchUserProfile(username: string): Promise<UserProfile | 
   if (!res.ok) return null;
   return res.json();
 }
+
+export async function downloadProject(slug: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/simulations/${slug}/download`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function updateSimulation(slug: string, data: { source_code: string; version?: string; changelog?: string }): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/simulations/${slug}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.ok;
+}
+
+export async function fetchVersions(slug: string): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/simulations/${slug}/versions`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.versions;
+}

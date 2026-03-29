@@ -153,6 +153,94 @@ simulationsRouter.get('/:slug/source', (c) => {
   return c.json({ name: sim.name, version: sim.version, source: sim.source_code });
 });
 
+// GET /simulations/:slug/download — download as a problocks project
+simulationsRouter.get('/:slug/download', (c) => {
+  const db = getDb();
+  const slug = c.req.param('slug');
+
+  const sim: any = db.prepare(`
+    SELECT s.*, u.username as author_username, u.display_name as author_name,
+           fs.name as forked_from_name, fs.slug as forked_from_slug
+    FROM simulations s
+    JOIN users u ON s.user_id = u.id
+    LEFT JOIN simulations fs ON s.forked_from = fs.id
+    WHERE s.slug = ?
+  `).get(slug);
+  db.close();
+
+  if (!sim) return c.json({ error: 'Not found' }, 404);
+
+  // Return a project structure that can be saved to disk
+  return c.json({
+    manifest: {
+      name: sim.name,
+      version: sim.version,
+      description: sim.description,
+      author: sim.author_username,
+      category: sim.category,
+      capabilities: JSON.parse(sim.capabilities),
+      engine: '>=0.0.1',
+      entry: 'src/index.ts',
+      forkedFrom: sim.forked_from_slug ? {
+        name: sim.forked_from_name,
+        slug: sim.forked_from_slug,
+        author: sim.author_username,
+      } : null,
+    },
+    files: {
+      'src/index.ts': sim.source_code,
+    },
+  });
+});
+
+// PUT /simulations/:slug — update simulation source code
+simulationsRouter.put('/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  const body = await c.req.json();
+  const { source_code, version, changelog } = body;
+
+  if (!source_code) return c.json({ error: 'source_code required' }, 400);
+
+  const db = getDb();
+  const sim: any = db.prepare(`SELECT id, version FROM simulations WHERE slug = ?`).get(slug);
+  if (!sim) { db.close(); return c.json({ error: 'Not found' }, 404); }
+
+  const newVersion = version ?? sim.version;
+
+  // Save current version to history before updating
+  db.prepare(`
+    INSERT OR IGNORE INTO simulation_versions (id, simulation_id, version, source_code, changelog)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(nanoid(), sim.id, newVersion, source_code, changelog ?? '');
+
+  // Update the simulation
+  db.prepare(`
+    UPDATE simulations SET source_code = ?, version = ?, updated_at = datetime('now') WHERE slug = ?
+  `).run(source_code, newVersion, slug);
+
+  db.close();
+  return c.json({ slug, version: newVersion });
+});
+
+// GET /simulations/:slug/versions — get version history
+simulationsRouter.get('/:slug/versions', (c) => {
+  const db = getDb();
+  const slug = c.req.param('slug');
+
+  const sim: any = db.prepare(`SELECT id FROM simulations WHERE slug = ?`).get(slug);
+  if (!sim) { db.close(); return c.json({ error: 'Not found' }, 404); }
+
+  const versions = db.prepare(`
+    SELECT version, changelog, source_code, created_at
+    FROM simulation_versions
+    WHERE simulation_id = ?
+    ORDER BY created_at DESC
+  `).all(sim.id);
+
+  db.close();
+  return c.json({ versions });
+});
+
 // POST /simulations — publish a new simulation
 simulationsRouter.post('/', async (c) => {
   const body = await c.req.json();

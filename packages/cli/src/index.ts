@@ -15,6 +15,7 @@ import { initCommand } from './commands/init.js';
 import { devCommand } from './commands/dev.js';
 import { buildCommand } from './commands/build.js';
 import { publishCommand } from './commands/publish.js';
+import { cloneCommand } from './commands/clone.js';
 
 const program = new Command();
 
@@ -47,5 +48,10 @@ program
   .option('--minor <message>', 'Publish as minor version (new feature)')
   .option('--major <message>', 'Publish as major version (breaking change)')
   .action(publishCommand);
+
+program
+  .command('clone <slug>')
+  .description('Download a simulation from the marketplace to edit locally')
+  .action(cloneCommand);
 
 program.parse();

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { fetchSimulation, API_BASE, type Simulation } from '@/lib/api';
+import { fetchSimulation, fetchVersions, downloadProject, API_BASE, type Simulation } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
-  ArrowLeft, Play, Star, Users, Calendar, Code, Shield, ExternalLink, Heart, GitFork,
+  ArrowLeft, Play, Star, Users, Calendar, Code, Shield, ExternalLink, Heart, GitFork, Download, History,
 } from 'lucide-react';
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
@@ -26,13 +26,31 @@ export function DetailPage() {
   const navigate = useNavigate();
   const [sim, setSim] = useState<Simulation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [versions, setVersions] = useState<any[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
     fetchSimulation(slug)
       .then(setSim)
       .finally(() => setLoading(false));
+    fetchVersions(slug).then(setVersions);
   }, [slug]);
+
+  const handleDownload = async () => {
+    if (!slug) return;
+    const project = await downloadProject(slug);
+    if (!project) return;
+
+    // Create a downloadable JSON file with the project structure
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug}.problocks.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
@@ -128,11 +146,23 @@ export function DetailPage() {
                   >
                     <GitFork className="h-4 w-4" /> Fork
                   </Button>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={handleDownload}>
+                    <Download className="h-4 w-4" /> Download
+                  </Button>
                   <Button variant="outline" size="sm" className="gap-1">
                     <Heart className="h-4 w-4" /> Favorite
                   </Button>
                 </div>
               </div>
+
+              {/* Forked from attribution */}
+              {(sim as any).forked_from && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Forked from <Link to={`/sim/${(sim as any).forked_from}`} className="text-primary hover:underline">
+                    {(sim as any).forked_from}
+                  </Link>
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -156,6 +186,43 @@ export function DetailPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Version history */}
+            {versions.length > 0 && (
+              <div>
+                <button
+                  className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2 hover:text-foreground"
+                  onClick={() => setShowVersions(!showVersions)}
+                >
+                  <History className="h-4 w-4" />
+                  Version History ({versions.length})
+                  <span className="text-xs">{showVersions ? '▼' : '▶'}</span>
+                </button>
+                {showVersions && (
+                  <div className="space-y-2">
+                    {versions.map((v: any, i: number) => (
+                      <Card key={i}>
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <Badge variant="outline" className="text-xs">v{v.version}</Badge>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(v.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {v.changelog && <p className="text-xs text-muted-foreground">{v.changelog}</p>}
+                          <details className="mt-2">
+                            <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">View source</summary>
+                            <pre className="mt-1 max-h-[150px] overflow-auto rounded bg-[#1e1e1e] p-2 font-mono text-[10px] text-gray-400">
+                              {v.source_code}
+                            </pre>
+                          </details>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right sidebar */}
