@@ -1,0 +1,27 @@
+{
+  "name": "@problocks/cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Problocks CLI — init, dev, publish simulations",
+  "type": "module",
+  "bin": {
+    "problocks": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@problocks/sdk": "0.0.1",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "fs-extra": "^11.3.4",
+    "ora": "^9.3.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

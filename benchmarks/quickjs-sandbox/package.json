@@ -1,0 +1,18 @@
+{
+  "name": "@problocks/benchmark-quickjs",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Benchmark: QuickJS-in-WASM vs native V8 for physics simulation performance",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-vm-modules dist/index.js",
+    "build": "tsc",
+    "bench": "npm run build && npm run start"
+  },
+  "dependencies": {
+    "quickjs-emscripten": "^0.31.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

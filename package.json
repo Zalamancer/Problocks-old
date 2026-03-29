@@ -1,0 +1,20 @@
+{
+  "name": "problocks",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Educational simulation platform — build, share, and monetize interactive lab tools",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "benchmarks/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web-studio",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "benchmark:sandbox": "npm run start --workspace=benchmarks/quickjs-sandbox"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
