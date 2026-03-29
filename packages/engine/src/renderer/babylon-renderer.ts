@@ -42,6 +42,7 @@ export class BabylonRenderer extends Renderer {
   private terrainMesh: BABYLON.GroundMesh | null = null;
   private waterMesh: BABYLON.Mesh | null = null;
   private waterMaterial: WaterMaterial | null = null;
+  private skybox: BABYLON.Mesh | null = null;
 
   async init(options: RendererOptions): Promise<void> {
     const canvas = options.canvas;
@@ -80,6 +81,18 @@ export class BabylonRenderer extends Renderer {
 
     const dir = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-1, -2, -1), this.scene);
     dir.intensity = 0.7;
+
+    // Skybox for water reflections
+    const skybox = BABYLON.MeshBuilder.CreateBox('__skybox', { size: 1000 }, this.scene);
+    const skyMat = new BABYLON.StandardMaterial('__skyboxMat', this.scene);
+    skyMat.backFaceCulling = false;
+    skyMat.disableLighting = true;
+    skyMat.emissiveColor = new BABYLON.Color3(0.53, 0.72, 0.9);
+    skyMat.diffuseColor = BABYLON.Color3.Black();
+    skyMat.specularColor = BABYLON.Color3.Black();
+    skybox.material = skyMat;
+    skybox.infiniteDistance = true;
+    this.skybox = skybox;
 
     // Grid ground
     const ground = BABYLON.MeshBuilder.CreateGround('__ground', { width: 30, height: 30 }, this.scene);
@@ -341,15 +354,20 @@ export class BabylonRenderer extends Renderer {
     );
     const waterColor = BABYLON.Color3.FromHexString(color);
     waterMat.waterColor = waterColor;
-    waterMat.colorBlendFactor = 0.3;
-    waterMat.windForce = waveSpeed * -5;
+    waterMat.colorBlendFactor = 0.15;
+    waterMat.windForce = waveSpeed * -15;
     waterMat.waveHeight = waveHeight;
-    waterMat.waveSpeed = waveSpeed * 50;
-    waterMat.waveLength = 0.3;
+    waterMat.waveSpeed = waveSpeed * 15;
+    waterMat.waveLength = 0.1;
     waterMat.windDirection = new BABYLON.Vector2(1, 1);
-    waterMat.bumpHeight = 0.1;
+    waterMat.bumpHeight = 0.4;
+    waterMat.bumpSuperimpose = true;
+    waterMat.bumpAffectsReflection = true;
 
-    // Add terrain + entity meshes to reflection/refraction
+    // Add skybox, terrain + entity meshes to reflection/refraction
+    if (this.skybox) {
+      waterMat.addToRenderList(this.skybox);
+    }
     if (this.terrainMesh) {
       waterMat.addToRenderList(this.terrainMesh);
     }
