@@ -459,7 +459,7 @@ export class UnifiedGizmo {
               this.hovered = newHovered;
               this.updateHighlights();
               const canvas = this.scene.getEngine().getRenderingCanvas();
-              if (canvas) canvas.style.cursor = newHovered ? 'pointer' : '';
+              if (canvas) canvas.style.cursor = newHovered ? 'grab' : '';
             }
           }
           break;
@@ -613,7 +613,7 @@ export class UnifiedGizmo {
     this.updateHighlights();
 
     const canvas = this.scene.getEngine().getRenderingCanvas();
-    if (canvas) canvas.style.cursor = this.hovered ? 'pointer' : '';
+    if (canvas) canvas.style.cursor = this.hovered ? 'grab' : '';
 
     // Re-enable camera controls
     const camera = this.scene.activeCamera;
