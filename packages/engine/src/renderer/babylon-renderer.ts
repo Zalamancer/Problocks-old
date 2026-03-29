@@ -1,5 +1,5 @@
 import * as BABYLON from '@babylonjs/core';
-import { GridMaterial, WaterMaterial } from '@babylonjs/materials';
+import { GridMaterial } from '@babylonjs/materials';
 import { Renderer, type RendererOptions } from './renderer.js';
 import { UnifiedGizmo } from './unified-gizmo.js';
 import type { TerrainLayer } from '../core/component.js';
@@ -41,7 +41,6 @@ export class BabylonRenderer extends Renderer {
   private attachedGizmoEntityId: string | null = null;
   private terrainMesh: BABYLON.GroundMesh | null = null;
   private waterMesh: BABYLON.Mesh | null = null;
-  private waterMaterial: WaterMaterial | null = null;
 
   async init(options: RendererOptions): Promise<void> {
     const canvas = options.canvas;
@@ -61,12 +60,12 @@ export class BabylonRenderer extends Renderer {
 
     // Camera
     this.camera = new BABYLON.ArcRotateCamera(
-      'camera', -Math.PI / 4, Math.PI / 3, 15,
-      new BABYLON.Vector3(0, 2, 0), this.scene,
+      'camera', -Math.PI / 4, Math.PI / 3, 40,
+      new BABYLON.Vector3(0, 5, 0), this.scene,
     );
     this.camera.attachControl(canvas, true);
     this.camera.lowerRadiusLimit = 2;
-    this.camera.upperRadiusLimit = 100;
+    this.camera.upperRadiusLimit = 200;
     this.camera.wheelPrecision = 20;
 
     // Disable default wheel zoom — Viewport handles wheel events for orbit/zoom
@@ -323,60 +322,31 @@ export class BabylonRenderer extends Renderer {
   createWater(options: WaterRenderOptions): BABYLON.Mesh {
     if (this.waterMesh) {
       this.waterMesh.dispose();
-      this.waterMaterial?.dispose();
     }
 
-    const { width, depth, waterLevel, color, waveHeight, waveSpeed } = options;
+    const { width, depth, waterLevel, color } = options;
 
     const water = BABYLON.MeshBuilder.CreateGround('__water', {
       width,
       height: depth,
-      subdivisions: 64,
+      subdivisions: 32,
     }, this.scene);
     water.position.y = waterLevel;
 
-    const waterMat = new WaterMaterial('__waterMat', this.scene);
+    // Simple transparent water — no external textures needed
+    const waterMat = new BABYLON.StandardMaterial('__waterMat', this.scene);
     const waterColor = BABYLON.Color3.FromHexString(color);
     waterMat.diffuseColor = waterColor;
-    waterMat.windForce = waveSpeed * -5;
-    waterMat.waveHeight = waveHeight;
-    waterMat.waveSpeed = waveSpeed * 50;
-    waterMat.windDirection = new BABYLON.Vector2(1, 1);
-    waterMat.waterColor = waterColor;
-    waterMat.colorBlendFactor = 0.3;
-    waterMat.bumpHeight = 0.1;
-    waterMat.waveLength = 0.3;
-
-    // Add reflection/refraction for all meshes in scene
-    if (this.terrainMesh) {
-      waterMat.addToRenderList(this.terrainMesh);
-    }
-    // Add skybox / environment if present
-    const skybox = this.scene.getMeshByName('__skybox');
-    if (skybox) waterMat.addToRenderList(skybox);
-
-    // Also reflect entity meshes
-    for (const [, entry] of this.meshes) {
-      waterMat.addToRenderList(entry.mesh);
-    }
+    waterMat.specularColor = new BABYLON.Color3(0.4, 0.4, 0.5);
+    waterMat.alpha = 0.45;
+    waterMat.backFaceCulling = false;
 
     water.material = waterMat;
     this.waterMesh = water;
-    this.waterMaterial = waterMat;
     return water;
   }
 
   getWaterLevel(): number {
     return this.waterMesh?.position.y ?? 0;
-  }
-
-  /**
-   * Add a mesh to water reflection/refraction lists.
-   * Call after creating new entity meshes if water exists.
-   */
-  addToWaterRenderList(mesh: BABYLON.AbstractMesh): void {
-    if (this.waterMaterial) {
-      this.waterMaterial.addToRenderList(mesh);
-    }
   }
 }
