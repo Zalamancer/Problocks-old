@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, useContext, useCallback } from 'react';
 import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
-import { TerrainComponent, WaterComponent } from '@problocks/engine/core/component';
 import { useStudio, StudioContext } from '@/store/studio-store';
 
 /**
@@ -44,24 +43,6 @@ export function Viewport() {
 
       // Register sim with the store so RunScript can access it
       (window as any).__problocks_sim = sim;
-
-      // Create terrain + water
-      const terrain = new TerrainComponent();
-      terrain.width = 100;
-      terrain.depth = 100;
-      terrain.subdivisions = 128;
-      terrain.maxHeight = 10;
-      terrain.seed = 42;
-      terrain.noiseScale = 0.03;
-      sim.createTerrain(terrain);
-
-      const water = new WaterComponent();
-      water.width = 100;
-      water.depth = 100;
-      water.waterLevel = 2.5;
-      water.buoyancy = 9.8;
-      water.waterDrag = 0.8;
-      sim.createWater(water);
 
       // Create all entities from store
       for (const entity of entities) {
@@ -121,11 +102,7 @@ export function Viewport() {
         }
       };
 
-      // Prevent Safari pinch-to-zoom on canvas only
-      canvas!.addEventListener('gesturestart', (e: Event) => e.preventDefault());
-      canvas!.addEventListener('gesturechange', (e: Event) => e.preventDefault());
-
-      // Two-finger scroll → orbit (spin), pinch → zoom
+      // Two-finger scroll → orbit in all directions, pinch → zoom
       const cam = scene.activeCamera as any;
       canvas!.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
@@ -138,12 +115,9 @@ export function Viewport() {
             Math.min(cam.upperRadiusLimit ?? 100, cam.radius * (1 + zoomDelta)),
           );
         } else {
-          // Two-finger swipe → orbit/spin in both directions
-          const orbitSpeed = 0.005;
-          cam.alpha -= e.deltaX * orbitSpeed;
-          cam.beta -= e.deltaY * orbitSpeed;
-          // Clamp beta to prevent flipping (keep between ~5° and ~175°)
-          cam.beta = Math.max(0.05, Math.min(Math.PI - 0.05, cam.beta));
+          // Two-finger scroll → orbit camera
+          if (e.deltaX !== 0) cam.alpha += e.deltaX * 0.008;
+          if (e.deltaY !== 0) cam.beta += e.deltaY * 0.008;
         }
       }, { passive: false });
 
