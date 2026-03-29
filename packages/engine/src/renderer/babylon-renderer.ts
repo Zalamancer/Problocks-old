@@ -1,5 +1,5 @@
 import * as BABYLON from '@babylonjs/core';
-import { GridMaterial } from '@babylonjs/materials';
+import { GridMaterial, WaterMaterial } from '@babylonjs/materials';
 import { Renderer, type RendererOptions } from './renderer.js';
 import { UnifiedGizmo } from './unified-gizmo.js';
 import type { TerrainLayer } from '../core/component.js';
@@ -41,6 +41,7 @@ export class BabylonRenderer extends Renderer {
   private attachedGizmoEntityId: string | null = null;
   private terrainMesh: BABYLON.GroundMesh | null = null;
   private waterMesh: BABYLON.Mesh | null = null;
+  private waterMaterial: WaterMaterial | null = null;
 
   async init(options: RendererOptions): Promise<void> {
     const canvas = options.canvas;
@@ -324,29 +325,51 @@ export class BabylonRenderer extends Renderer {
       this.waterMesh.dispose();
     }
 
-    const { width, depth, waterLevel, color } = options;
+    const { width, depth, waterLevel, color, waveHeight, waveSpeed } = options;
 
     const water = BABYLON.MeshBuilder.CreateGround('__water', {
       width,
       height: depth,
-      subdivisions: 32,
+      subdivisions: 64,
     }, this.scene);
     water.position.y = waterLevel;
 
-    // Simple transparent water — no external textures needed
-    const waterMat = new BABYLON.StandardMaterial('__waterMat', this.scene);
+    const waterMat = new WaterMaterial('__waterMat', this.scene, new BABYLON.Vector2(512, 512));
+    waterMat.bumpTexture = new BABYLON.Texture(
+      'https://assets.babylonjs.com/textures/waterbump.png',
+      this.scene,
+    );
     const waterColor = BABYLON.Color3.FromHexString(color);
-    waterMat.diffuseColor = waterColor;
-    waterMat.specularColor = new BABYLON.Color3(0.4, 0.4, 0.5);
-    waterMat.alpha = 0.45;
-    waterMat.backFaceCulling = false;
+    waterMat.waterColor = waterColor;
+    waterMat.colorBlendFactor = 0.3;
+    waterMat.windForce = waveSpeed * -5;
+    waterMat.waveHeight = waveHeight;
+    waterMat.waveSpeed = waveSpeed * 50;
+    waterMat.waveLength = 0.3;
+    waterMat.windDirection = new BABYLON.Vector2(1, 1);
+    waterMat.bumpHeight = 0.1;
+
+    // Add terrain + entity meshes to reflection/refraction
+    if (this.terrainMesh) {
+      waterMat.addToRenderList(this.terrainMesh);
+    }
+    for (const [, entry] of this.meshes) {
+      waterMat.addToRenderList(entry.mesh);
+    }
 
     water.material = waterMat;
     this.waterMesh = water;
+    this.waterMaterial = waterMat;
     return water;
   }
 
   getWaterLevel(): number {
     return this.waterMesh?.position.y ?? 0;
+  }
+
+  addToWaterRenderList(mesh: BABYLON.AbstractMesh): void {
+    if (this.waterMaterial) {
+      this.waterMaterial.addToRenderList(mesh);
+    }
   }
 }
