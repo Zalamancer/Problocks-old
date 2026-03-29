@@ -34,8 +34,8 @@ export function PropertiesPanel() {
               />
             </PanelSection>
 
-            {/* Transform — hidden for terrain */}
-            {entity.type !== 'terrain' && <PanelSection title="Transform" collapsible>
+            {/* Transform */}
+            <PanelSection title="Transform" collapsible>
               {/* Position: label + X Y Z inline pills */}
               <div className="flex items-center gap-3 mb-1">
                 <span className="text-gray-400 text-sm shrink-0 w-16">Position</span>
@@ -65,7 +65,7 @@ export function PropertiesPanel() {
                   <PanelSlider label="" value={entity.scale.z} onChange={(v) => updateEntity(entity.id, { scale: { ...entity.scale, z: v } })} min={0.1} max={10} step={0.1} precision={2} inline className="flex-1" />
                 </div>
               </div>
-            </PanelSection>}
+            </PanelSection>
 
             {/* Mesh */}
             {entity.shape && (

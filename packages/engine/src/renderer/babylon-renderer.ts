@@ -199,6 +199,21 @@ export class BabylonRenderer extends Renderer {
 
   handleResize(): void { this.engine.resize(); }
 
+  setTerrainTransform(
+    position: { x: number; y: number; z: number },
+    rotation: { x: number; y: number; z: number },
+    scale: { x: number; y: number; z: number },
+  ): void {
+    if (this.terrainMesh) {
+      this.terrainMesh.position.set(position.x, position.y, position.z);
+      this.terrainMesh.rotation.set(rotation.x, rotation.y, rotation.z);
+      this.terrainMesh.scaling.set(scale.x, scale.y, scale.z);
+    }
+    if (this.waterMesh) {
+      this.waterMesh.position.set(position.x, position.y + (this.waterMesh.position.y - (this.terrainMesh?.position.y ?? 0)), position.z);
+    }
+  }
+
   getScene(): BABYLON.Scene { return this.scene; }
 
   getMesh(entityId: string): BABYLON.AbstractMesh | null {

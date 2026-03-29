@@ -218,7 +218,11 @@ export function Viewport() {
   useEffect(() => {
     if (!engineRef.current || !ready || isPlaying || !selectedEntityId) return;
     const entity = entities.find(e => e.id === selectedEntityId);
-    if (entity?.shape) {
+    if (!entity) return;
+
+    if (entity.type === 'terrain') {
+      engineRef.current.renderer.setTerrainTransform(entity.position, entity.rotation, entity.scale);
+    } else if (entity.shape) {
       try {
         engineRef.current.sim.setEntityPosition(entity.id, entity.position);
       } catch {
