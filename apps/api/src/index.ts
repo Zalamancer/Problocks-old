@@ -8,8 +8,17 @@ import { usersRouter } from './routes/users.js';
 import { classroomsRouter } from './routes/classrooms.js';
 import { economyRouter } from './routes/economy.js';
 
-// Initialize database
+// Initialize database + auto-seed if empty
 initDb();
+
+import { getDb } from './db/schema.js';
+const _db = getDb();
+const count = (_db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
+_db.close();
+if (count === 0) {
+  console.log('Empty database detected, seeding...');
+  await import('./db/seed.js');
+}
 
 const app = new Hono();
 
