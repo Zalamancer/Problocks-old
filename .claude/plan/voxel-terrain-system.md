@@ -540,39 +540,39 @@ Replace the current heightmap-based terrain (`TerrainComponent` + `noise.ts` + `
 ### 8.1 Terrain API Bindings
 **File**: `packages/engine/src/terrain/api/terrain-script-bindings.ts`
 
-- [ ] Register `pb.terrain` namespace in QuickJS runtime
-- [ ] `pb.terrain.fillBall(center, radius, material)` — sphere fill
-- [ ] `pb.terrain.fillBlock(position, size, material)` — box fill
-- [ ] `pb.terrain.fillCylinder(position, height, radius, material)` — cylinder fill
-- [ ] `pb.terrain.fillRegion(min, max, material)` — rectangular fill
-- [ ] `pb.terrain.fillWedge(position, size, material)` — wedge fill
-- [ ] Material parameter accepts string names ('Grass', 'Rock', etc.)
+- [x] Register `pb.terrain` namespace in QuickJS runtime
+- [x] `pb.terrain.fillBall(center, radius, material)` — sphere fill
+- [x] `pb.terrain.fillBlock(position, size, material)` — box fill
+- [x] `pb.terrain.fillCylinder(position, height, radius, material)` — cylinder fill
+- [x] `pb.terrain.fillRegion(min, max, material)` — rectangular fill
+- [x] `pb.terrain.fillWedge(position, size, material)` — wedge fill
+- [x] Material parameter accepts string names ('Grass', 'Rock', etc.)
 
 ### 8.2 Read/Write Methods
-- [ ] `pb.terrain.readVoxels(min, max): { materials, occupancy }` — 3D arrays
-- [ ] `pb.terrain.writeVoxels(min, max, materials, occupancy)` — 3D arrays
-- [ ] `pb.terrain.getHeight(x, z): number` — scan down to find first solid voxel
-- [ ] `pb.terrain.getMaterial(x, y, z): string` — material name at position
-- [ ] `pb.terrain.setVoxel(x, y, z, occupancy, material)` — single voxel
-- [ ] `pb.terrain.clear()` — clear all terrain
+- [x] `pb.terrain.readVoxels(min, max): { materials, occupancy }` — 3D arrays
+- [x] `pb.terrain.writeVoxels(min, max, materials, occupancy)` — 3D arrays
+- [x] `pb.terrain.getHeight(x, z): number` — scan down to find first solid voxel
+- [x] `pb.terrain.getMaterial(x, y, z): string` — material name at position
+- [x] `pb.terrain.setVoxel(x, y, z, occupancy, material)` — single voxel
+- [x] `pb.terrain.clear()` — clear all terrain
 
 ### 8.3 Properties
-- [ ] `pb.terrain.waterColor`, `waterReflectance`, `waterTransparency`, `waterWaveSize`, `waterWaveSpeed`
-- [ ] `pb.terrain.decoration` (boolean), `pb.terrain.grassLength` (0.1–1.0)
-- [ ] `pb.terrain.setMaterialColor(name, {r,g,b})`, `getMaterialColor()`, `resetMaterialColor()`
+- [x] `pb.terrain.waterColor`, `waterReflectance`, `waterTransparency`, `waterWaveSize`, `waterWaveSpeed`
+- [x] `pb.terrain.decoration` (boolean), `pb.terrain.grassLength` (0.1–1.0)
+- [x] `pb.terrain.setMaterialColor(name, {r,g,b})`, `getMaterialColor()`, `resetMaterialColor()`
 
 ### 8.4 Safety Limits
-- [ ] Max 100,000 voxels per single fill operation
-- [ ] Max 500,000 total voxel writes per frame
-- [ ] Script timeout: 5000ms
-- [ ] Throw descriptive error when limits exceeded
+- [x] Max 100,000 voxels per single fill operation
+- [x] Max 500,000 total voxel writes per frame
+- [x] Script timeout: 5000ms
+- [x] Throw descriptive error when limits exceeded
 
 ### 8.5 SDK Integration
 **File**: `packages/sdk/` (extend student-facing API)
 
-- [ ] Add `terrain` to SDK type definitions
-- [ ] Add autocomplete/documentation for all terrain methods
-- [ ] Example scripts in SDK docs
+- [x] Add `terrain` to SDK type definitions
+- [x] Add autocomplete/documentation for all terrain methods
+- [x] Example scripts in SDK docs
 
 **MILESTONE**: Student scripts create procedural terrain, deform terrain on impact, build mazes.
 

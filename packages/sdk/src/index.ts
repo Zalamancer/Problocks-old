@@ -18,3 +18,6 @@ export { Component } from '@problocks/engine';
 export { Shape } from './api/shape.js';
 export { Color } from './api/color.js';
 export { ProblocksMath as PBMath } from './api/math.js';
+
+// Terrain scripting API types (used for autocomplete in student code)
+export type { TerrainAPI, TerrainMaterialName, VoxelData, Vec3 as TerrainVec3, RGB } from './api/terrain.js';

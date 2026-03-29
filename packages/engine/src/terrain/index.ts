@@ -79,5 +79,24 @@ export { createSeaLevel, evaporateWater } from './editor/sea-level.js';
 export { loadImage, parseHeightmap, parseColormap, importTerrain } from './generation/heightmap-importer.js';
 export type { ImportRegion } from './generation/heightmap-importer.js';
 
+// Scripting API (Phase 8)
+export {
+  registerTerrainBindings,
+  getTerrainNamespaceShim,
+  resetFrameBudget,
+  fillBall,
+  fillBlock,
+  fillCylinder,
+  fillRegionAPI,
+  fillWedge,
+  readVoxels,
+  writeVoxels,
+  getHeight,
+  MAX_VOXELS_PER_FILL,
+  MAX_VOXELS_PER_FRAME,
+  SCRIPT_TIMEOUT_MS,
+} from './api/terrain-script-bindings.js';
+export type { TerrainAPIState } from './api/terrain-script-bindings.js';
+
 // Legacy noise (still used by generation)
 export { generateHeightmap, fbm, setNoiseSeed } from './noise.js';
