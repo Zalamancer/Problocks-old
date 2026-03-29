@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   ArrowLeft, Play, Star, Users, Calendar, Code, Shield, ExternalLink, Heart, GitFork, Download, History,
 } from 'lucide-react';
+import { ShareDialog } from '@/components/marketplace/ShareDialog';
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
   physics: 'linear-gradient(135deg, #2d1b69, #11998e)',
@@ -149,9 +150,7 @@ export function DetailPage() {
                   <Button variant="outline" size="sm" className="gap-1" onClick={handleDownload}>
                     <Download className="h-4 w-4" /> Download
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    <Heart className="h-4 w-4" /> Favorite
-                  </Button>
+                  <ShareDialog slug={slug!} name={sim.name} />
                 </div>
               </div>
 

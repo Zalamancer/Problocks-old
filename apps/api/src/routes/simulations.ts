@@ -337,6 +337,58 @@ simulationsRouter.get('/meta/suggestions', (c) => {
   });
 });
 
+// POST /simulations/:slug/favorite — toggle favorite
+simulationsRouter.post('/:slug/favorite', async (c) => {
+  const slug = c.req.param('slug');
+  const { user_id } = await c.req.json();
+  if (!user_id) return c.json({ error: 'user_id required' }, 400);
+
+  const db = getDb();
+  const sim: any = db.prepare(`SELECT id FROM simulations WHERE slug = ?`).get(slug);
+  if (!sim) { db.close(); return c.json({ error: 'Not found' }, 404); }
+
+  const existing = db.prepare(`SELECT 1 FROM favorites WHERE user_id = ? AND simulation_id = ?`).get(user_id, sim.id);
+
+  if (existing) {
+    db.prepare(`DELETE FROM favorites WHERE user_id = ? AND simulation_id = ?`).run(user_id, sim.id);
+    db.close();
+    return c.json({ favorited: false });
+  } else {
+    db.prepare(`INSERT INTO favorites (user_id, simulation_id) VALUES (?, ?)`).run(user_id, sim.id);
+    db.close();
+    return c.json({ favorited: true });
+  }
+});
+
+// GET /simulations/:slug/favorite/:userId — check if favorited
+simulationsRouter.get('/:slug/favorite/:userId', (c) => {
+  const db = getDb();
+  const slug = c.req.param('slug');
+  const userId = c.req.param('userId');
+
+  const sim: any = db.prepare(`SELECT id FROM simulations WHERE slug = ?`).get(slug);
+  if (!sim) { db.close(); return c.json({ favorited: false }); }
+
+  const fav = db.prepare(`SELECT 1 FROM favorites WHERE user_id = ? AND simulation_id = ?`).get(userId, sim.id);
+  db.close();
+  return c.json({ favorited: !!fav });
+});
+
+// GET /users/:userId/favorites — get user's favorites
+simulationsRouter.get('/user/:userId/favorites', (c) => {
+  const db = getDb();
+  const userId = c.req.param('userId');
+
+  const favs = db.prepare(`
+    SELECT s.name, s.slug, s.category, s.plays, s.rating_sum, s.rating_count
+    FROM favorites f JOIN simulations s ON f.simulation_id = s.id
+    WHERE f.user_id = ? ORDER BY f.created_at DESC
+  `).all(userId);
+
+  db.close();
+  return c.json({ favorites: favs });
+});
+
 // POST /simulations — publish a new simulation
 simulationsRouter.post('/', async (c) => {
   const body = await c.req.json();
