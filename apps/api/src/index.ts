@@ -15,7 +15,7 @@ const app = new Hono();
 
 // CORS for frontend apps
 app.use('*', cors({
-  origin: ['http://localhost:4000', 'http://localhost:4001', 'http://localhost:3000'],
+  origin: ['http://localhost:4000', 'http://localhost:4001', 'http://localhost:3000', 'https://marketplace-sigma-ebon.vercel.app'],
   credentials: true,
 }));
 
@@ -35,6 +35,7 @@ app.route('/api/economy', economyRouter);
 
 // Start server
 const PORT = parseInt(process.env.PORT ?? '5000', 10);
-console.log(`Problocks API running at http://localhost:${PORT}`);
+const HOST = process.env.HOST ?? '0.0.0.0';
+console.log(`Problocks API running at http://${HOST}:${PORT}`);
 
-serve({ fetch: app.fetch, port: PORT });
+serve({ fetch: app.fetch, port: PORT, hostname: HOST });
