@@ -185,6 +185,7 @@
   },
   "active": "41dc0e8cbcb2c92c",
   "lastOpenFiles": [
+    "apps/marketplace/src/pages/LandingPage.tsx",
     "apps/marketplace/dist/assets/babylon-renderer-Cx5rMnzH.js",
     "apps/marketplace/dist/assets/volumetricLightingBlendVolume.fragment-CJ6DU3I9.js",
     "apps/marketplace/dist/assets/ddsTextureLoader-CvstmH5o.js",
@@ -195,7 +196,6 @@
     "apps/marketplace/dist/assets/ktxTextureLoader-BYLmHXqW.js",
     "apps/marketplace/dist/assets/envTextureLoader-Cz6Aq7zt.js",
     "apps/marketplace/dist/assets/hdrTextureLoader-v8Epjldr.js",
-    "apps/marketplace/dist/assets/iesTextureLoader-DaFT9R_C.js",
     "docs/plans/002-next-features-roadmap.md",
     "node_modules/react-router/node_modules/cookie/README.md",
     "node_modules/react-router/README.md",
