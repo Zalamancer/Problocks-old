@@ -22,6 +22,8 @@ export type { ChunkMeshResult } from './meshing/chunk-mesher.js';
 
 // Rendering
 export { ChunkRenderer } from './rendering/chunk-renderer.js';
+export { WaterVoxelRenderer, defaultWaterProperties } from './rendering/water-voxel-renderer.js';
+export type { WaterProperties } from './rendering/water-voxel-renderer.js';
 
 // Generation
 export { BIOMES, getBiomeIds, getBiome } from './generation/biome.js';
@@ -36,6 +38,8 @@ export type { GenerateOptions } from './generation/terrain-generator.js';
 // Physics
 export { TerrainPhysics, ColliderRebuildQueue } from './physics/terrain-physics.js';
 export type { TerrainRaycastHit } from './physics/terrain-physics.js';
+export { sampleSubmersion, computeBuoyancyForce, DEFAULT_BUOYANCY_CONFIG } from './physics/voxel-buoyancy.js';
+export type { BuoyancyBounds, BuoyancyResult, BuoyancyForce, BuoyancyConfig } from './physics/voxel-buoyancy.js';
 
 // Editor — Brush
 export { iterateBrushVoxels, defaultBrushConfig } from './editor/brush.js';

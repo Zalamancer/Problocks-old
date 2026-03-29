@@ -500,34 +500,34 @@ Replace the current heightmap-based terrain (`TerrainComponent` + `noise.ts` + `
 **Goal**: Voxel-based water with shader rendering and buoyancy.
 
 ### 7.1 Water as Voxel Material
-- [ ] Water voxels stored in VoxelGrid with `TerrainMaterial.Water`
-- [ ] `ChunkMesher` separates water voxels into a second mesh (`waterMesh`)
-- [ ] Water Marching Cubes runs independently from solid terrain
+- [x] Water voxels stored in VoxelGrid with `TerrainMaterial.Water`
+- [x] `ChunkMesher` separates water voxels into a second mesh (`waterMesh`)
+- [x] Water Marching Cubes runs independently from solid terrain
 
 ### 7.2 Water Shader
 **File**: `packages/engine/src/terrain/rendering/water-voxel-renderer.ts`
 
-- [ ] Custom `BABYLON.ShaderMaterial` for water chunk meshes
-- [ ] Vertex shader: wave displacement using `sin/cos(worldPos + time * waveSpeed) * waveSize`
-- [ ] Fragment shader:
-  - [ ] Fresnel effect (more reflective at glancing angles)
-  - [ ] Environment/skybox reflection via cube map
-  - [ ] Configurable color, reflectance, transparency
-- [ ] Water properties object: `color`, `reflectance` (0–1), `transparency` (0–1), `waveSize` (0–1), `waveSpeed` (0–100)
-- [ ] Use `alpha = 1 - transparency * (1 - fresnel)` for depth-dependent transparency
+- [x] Custom `BABYLON.ShaderMaterial` for water chunk meshes
+- [x] Vertex shader: wave displacement using `sin/cos(worldPos + time * waveSpeed) * waveSize`
+- [x] Fragment shader:
+  - [x] Fresnel effect (more reflective at glancing angles)
+  - [x] Environment/skybox reflection via cube map
+  - [x] Configurable color, reflectance, transparency
+- [x] Water properties object: `color`, `reflectance` (0–1), `transparency` (0–1), `waveSize` (0–1), `waveSpeed` (0–100)
+- [x] Use `alpha = 1 - transparency * (1 - fresnel)` for depth-dependent transparency
 
 ### 7.3 Buoyancy Integration
-- [ ] Modify `SimulationLoop` buoyancy logic:
+- [x] Modify `SimulationLoop` buoyancy logic:
   - Sample voxel grid around entity bounds (not just a fixed plane Y)
   - Count Water voxels overlapping entity → submersion fraction
   - Apply buoyancy force = `submersion * gravity * mass`
   - Apply drag = `submersion * waterDrag * velocity`
-- [ ] Keep existing `WaterComponent` plane as optional visual-only enhancement
+- [x] Keep existing `WaterComponent` plane as optional visual-only enhancement
 
 ### 7.4 Water Properties UI
-- [ ] Add water properties to Terrain section of Properties panel
-- [ ] Color picker for water tint
-- [ ] Sliders for reflectance, transparency, wave size, wave speed
+- [x] Add water properties to Terrain section of Properties panel
+- [x] Color picker for water tint
+- [x] Sliders for reflectance, transparency, wave size, wave speed
 
 **MILESTONE**: Water fills terrain basins, entities float with buoyancy, waves animate.
 

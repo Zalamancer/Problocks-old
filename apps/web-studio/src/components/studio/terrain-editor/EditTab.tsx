@@ -12,7 +12,7 @@ import { MaterialPicker } from './MaterialPicker';
 // ── Types ──────────────────────────────────────────────────────────
 
 export type BrushTool = 'draw' | 'sculpt' | 'smooth' | 'flatten' | 'paint'
-  | 'select' | 'transform' | 'fill' | 'sealevel';
+  | 'select' | 'transform' | 'fill' | 'sealevel' | 'water';
 export type BrushShapeUI = 'sphere' | 'box' | 'cylinder';
 export type FlattenModeUI = 'both' | 'erode' | 'grow';
 export type PaintModeUI = 'paint' | 'replace';
@@ -47,6 +47,14 @@ export interface EditTabState {
   transformScaleZ: number;
   mergeEmpty: boolean;
   waterLevel: number;
+  // Water properties (Phase 7)
+  waterColorR: number;
+  waterColorG: number;
+  waterColorB: number;
+  waterReflectance: number;
+  waterTransparency: number;
+  waterWaveSize: number;
+  waterWaveSpeed: number;
 }
 
 // ── Section header (reused) ────────────────────────────────────────
@@ -112,6 +120,7 @@ const REGION_TOOLS: { id: BrushTool; label: string; icon: string }[] = [
   { id: 'transform', label: 'Transform', icon: '⤡' },
   { id: 'fill',      label: 'Fill',      icon: '▮' },
   { id: 'sealevel',  label: 'Sea Level', icon: '≋' },
+  { id: 'water',     label: 'Water',     icon: '~' },
 ];
 
 const SHAPES: { id: BrushShapeUI; label: string }[] = [
@@ -157,6 +166,22 @@ const BRUSH_TOOL_SET = new Set<BrushTool>(['draw', 'sculpt', 'smooth', 'flatten'
 
 function isBrushTool(tool: BrushTool): boolean {
   return BRUSH_TOOL_SET.has(tool);
+}
+
+/** Convert 0-255 RGB to hex string. */
+function rgbToHex(r: number, g: number, b: number): string {
+  const toHex = (v: number) => Math.round(v).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/** Parse hex string to 0-255 RGB. */
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
 }
 
 // ── Checkbox ──────────────────────────────────────────────────────
@@ -573,6 +598,75 @@ export function EditTab({ state, onChange }: EditTabProps) {
           </div>
         </div>
       )}
+
+      {/* ── Water Properties tool (Phase 7) ─────────── */}
+      {state.tool === 'water' && (
+        <div className="space-y-3">
+          <div>
+            <SectionHeader>Water Color</SectionHeader>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={rgbToHex(state.waterColorR, state.waterColorG, state.waterColorB)}
+                onChange={(e) => {
+                  const { r, g, b } = hexToRgb(e.target.value);
+                  onChange({ ...state, waterColorR: r, waterColorG: g, waterColorB: b });
+                }}
+                className="w-8 h-8 rounded border border-zinc-700 bg-zinc-800 cursor-pointer"
+              />
+              <span className="text-[11px] text-zinc-400">
+                {rgbToHex(state.waterColorR, state.waterColorG, state.waterColorB)}
+              </span>
+            </div>
+          </div>
+          <div>
+            <SectionHeader>Appearance</SectionHeader>
+            <div className="space-y-2.5">
+              <Slider
+                label="Reflectance"
+                value={state.waterReflectance}
+                min={0}
+                max={1}
+                step={0.05}
+                displayValue={state.waterReflectance.toFixed(2)}
+                onChange={(v) => update('waterReflectance', v)}
+              />
+              <Slider
+                label="Transparency"
+                value={state.waterTransparency}
+                min={0}
+                max={1}
+                step={0.05}
+                displayValue={state.waterTransparency.toFixed(2)}
+                onChange={(v) => update('waterTransparency', v)}
+              />
+            </div>
+          </div>
+          <div>
+            <SectionHeader>Waves</SectionHeader>
+            <div className="space-y-2.5">
+              <Slider
+                label="Wave Size"
+                value={state.waterWaveSize}
+                min={0}
+                max={1}
+                step={0.05}
+                displayValue={state.waterWaveSize.toFixed(2)}
+                onChange={(v) => update('waterWaveSize', v)}
+              />
+              <Slider
+                label="Wave Speed"
+                value={state.waterWaveSpeed}
+                min={0}
+                max={100}
+                step={1}
+                displayValue={`${state.waterWaveSpeed}`}
+                onChange={(v) => update('waterWaveSpeed', v)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -607,5 +701,13 @@ export function defaultEditTabState(): EditTabState {
     transformScaleZ: 1,
     mergeEmpty: false,
     waterLevel: 64,
+    // Water properties (Phase 7)
+    waterColorR: 12,
+    waterColorG: 84,
+    waterColorB: 92,
+    waterReflectance: 0.4,
+    waterTransparency: 0.5,
+    waterWaveSize: 0.3,
+    waterWaveSpeed: 15,
   };
 }
