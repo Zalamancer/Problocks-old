@@ -1,8 +1,9 @@
 import * as BABYLON from '@babylonjs/core';
-import { GridMaterial, WaterMaterial } from '@babylonjs/materials';
+import { GridMaterial } from '@babylonjs/materials';
 import { Renderer, type RendererOptions } from './renderer.js';
 import { UnifiedGizmo } from './unified-gizmo.js';
 import { WaterSimulation } from './water-simulation.js';
+import { WATER_VERTEX_SHADER, WATER_FRAGMENT_SHADER } from './water-shaders.js';
 import type { TerrainLayer } from '../core/component.js';
 
 interface MeshEntry {
@@ -42,7 +43,10 @@ export class BabylonRenderer extends Renderer {
   private attachedGizmoEntityId: string | null = null;
   private terrainMesh: BABYLON.GroundMesh | null = null;
   private waterMesh: BABYLON.Mesh | null = null;
-  private waterMaterial: WaterMaterial | null = null;
+  private waterShaderMat: BABYLON.ShaderMaterial | null = null;
+  private waterMirror: BABYLON.MirrorTexture | null = null;
+  private waterHeightTex: BABYLON.RawTexture | null = null;
+  private waterHeightBuf: Float32Array | null = null;
   private skybox: BABYLON.Mesh | null = null;
   private waterSim: WaterSimulation | null = null;
   private waterConfig: { width: number; depth: number } | null = null;
@@ -347,75 +351,101 @@ export class BabylonRenderer extends Renderer {
       this.scene.unregisterBeforeRender(this.waterUpdateCb);
       this.waterUpdateCb = null;
     }
-    if (this.waterMesh) {
-      this.waterMesh.dispose();
-    }
+    if (this.waterMesh) this.waterMesh.dispose();
+    if (this.waterMirror) this.waterMirror.dispose();
+    if (this.waterHeightTex) this.waterHeightTex.dispose();
+    if (this.waterShaderMat) this.waterShaderMat.dispose();
 
-    const { width, depth, waterLevel, color, waveHeight, waveSpeed } = options;
+    const { width, depth, waterLevel, color } = options;
     const subdivisions = 128;
     const simSize = subdivisions + 1; // 129×129 grid
-
-    // Updatable mesh for heightfield deformation
-    const water = BABYLON.MeshBuilder.CreateGround('__water', {
-      width,
-      height: depth,
-      subdivisions,
-      updatable: true,
-    }, this.scene);
-    water.position.y = waterLevel;
 
     // Heightfield simulation
     this.waterSim = new WaterSimulation(simSize);
     this.waterConfig = { width, depth };
 
-    // WaterMaterial for reflections/refractions + ambient bump detail
-    const waterMat = new WaterMaterial('__waterMat', this.scene, new BABYLON.Vector2(512, 512));
-    waterMat.bumpTexture = new BABYLON.Texture(
-      'https://assets.babylonjs.com/textures/waterbump.png',
-      this.scene,
+    // Water surface mesh (updatable for bounding info refresh)
+    const water = BABYLON.MeshBuilder.CreateGround('__water', {
+      width, height: depth, subdivisions, updatable: true,
+    }, this.scene);
+    water.position.y = waterLevel;
+
+    // ── Heightfield texture (RGBA float, R = height) ──
+    this.waterHeightBuf = new Float32Array(simSize * simSize * 4);
+    this.waterHeightTex = BABYLON.RawTexture.CreateRGBATexture(
+      this.waterHeightBuf, simSize, simSize, this.scene,
+      false, false,
+      BABYLON.Constants.TEXTURE_NEAREST_SAMPLINGMODE,
+      BABYLON.Constants.TEXTURETYPE_FLOAT,
     );
+
+    // ── Mirror texture for scene reflections ──
+    const mirror = new BABYLON.MirrorTexture('__waterMirror', 512, this.scene, true);
+    mirror.mirrorPlane = new BABYLON.Plane(0, -1, 0, waterLevel);
+    mirror.level = 1.0;
+    const renderList: BABYLON.AbstractMesh[] = [];
+    if (this.skybox) renderList.push(this.skybox);
+    if (this.terrainMesh) renderList.push(this.terrainMesh);
+    for (const [, entry] of this.meshes) renderList.push(entry.mesh);
+    mirror.renderList = renderList;
+    this.waterMirror = mirror;
+
+    // ── Register custom shaders ──
+    BABYLON.Effect.ShadersStore['problocks_waterVertexShader'] = WATER_VERTEX_SHADER;
+    BABYLON.Effect.ShadersStore['problocks_waterFragmentShader'] = WATER_FRAGMENT_SHADER;
+
+    // ── ShaderMaterial ──
     const waterColor = BABYLON.Color3.FromHexString(color);
-    waterMat.waterColor = waterColor;
-    waterMat.colorBlendFactor = 0.15;
-    waterMat.windForce = waveSpeed * -15;
-    waterMat.waveHeight = waveHeight;
-    waterMat.waveSpeed = waveSpeed * 15;
-    waterMat.waveLength = 0.1;
-    waterMat.windDirection = new BABYLON.Vector2(1, 1);
-    waterMat.bumpHeight = 0.4;
-    waterMat.bumpSuperimpose = true;
-    waterMat.bumpAffectsReflection = true;
+    const mat = new BABYLON.ShaderMaterial('__waterShader', this.scene, {
+      vertex: 'problocks_water',
+      fragment: 'problocks_water',
+    }, {
+      attributes: ['position', 'uv'],
+      uniforms: [
+        'worldViewProjection', 'world',
+        'cameraPosition', 'waterColor', 'skyColor',
+        'lightDir', 'texelSize', 'resolution',
+      ],
+      samplers: ['heightMap', 'reflectionSampler'],
+      needAlphaBlending: true,
+    });
 
-    // Add skybox, terrain + entity meshes to reflection/refraction
-    if (this.skybox) {
-      waterMat.addToRenderList(this.skybox);
-    }
-    if (this.terrainMesh) {
-      waterMat.addToRenderList(this.terrainMesh);
-    }
-    for (const [, entry] of this.meshes) {
-      waterMat.addToRenderList(entry.mesh);
-    }
+    mat.setTexture('heightMap', this.waterHeightTex);
+    mat.setTexture('reflectionSampler', mirror);
+    mat.setColor3('waterColor', waterColor);
+    mat.setColor3('skyColor', new BABYLON.Color3(0.53, 0.72, 0.9));
+    mat.setVector3('lightDir', new BABYLON.Vector3(-1, 2, -1));
+    mat.setFloat('texelSize', 1.0 / simSize);
+    mat.backFaceCulling = false;
 
-    water.material = waterMat;
+    water.material = mat;
     this.waterMesh = water;
-    this.waterMaterial = waterMat;
+    this.waterShaderMat = mat;
 
-    // Step simulation + deform mesh each frame
+    // ── Per-frame: step simulation → upload heightfield texture ──
     this.waterUpdateCb = () => {
-      if (!this.waterSim || !this.waterMesh) return;
+      if (!this.waterSim || !this.waterHeightTex || !this.waterHeightBuf) return;
       this.waterSim.step();
       this.waterSim.step(); // 2 steps/frame for stability
 
-      const positions = this.waterMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-      if (!positions) return;
-
+      // Pack heights into RGBA float texture (R channel)
       const heights = this.waterSim.heightData;
+      const buf = this.waterHeightBuf;
       const total = simSize * simSize;
       for (let i = 0; i < total; i++) {
-        positions[i * 3 + 1] = heights[i];
+        buf[i * 4] = heights[i];
       }
-      this.waterMesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
+      this.waterHeightTex.update(buf);
+
+      // Update camera-dependent uniforms
+      if (this.waterShaderMat) {
+        this.waterShaderMat.setVector3('cameraPosition', this.camera.position);
+        const canvas = this.engine.getRenderingCanvas();
+        if (canvas) {
+          this.waterShaderMat.setVector2('resolution',
+            new BABYLON.Vector2(canvas.width, canvas.height));
+        }
+      }
     };
     this.scene.registerBeforeRender(this.waterUpdateCb);
 
@@ -432,7 +462,7 @@ export class BabylonRenderer extends Renderer {
     if (!this.waterSim || !this.waterConfig) return base;
     const { width, depth } = this.waterConfig;
     const nx = (worldX + width / 2) / width;
-    const nz = (depth / 2 - worldZ) / depth; // inverted to match mesh row order
+    const nz = (depth / 2 - worldZ) / depth;
     return base + this.waterSim.getHeight(nx, nz);
   }
 
@@ -445,9 +475,10 @@ export class BabylonRenderer extends Renderer {
     this.waterSim.addDrop(nx, nz, radius, strength);
   }
 
+  /** Add a mesh to the water reflection render list. */
   addToWaterRenderList(mesh: BABYLON.AbstractMesh): void {
-    if (this.waterMaterial) {
-      this.waterMaterial.addToRenderList(mesh);
+    if (this.waterMirror) {
+      this.waterMirror.renderList?.push(mesh);
     }
   }
 }
