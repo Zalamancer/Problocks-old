@@ -3,6 +3,16 @@ import { createContext, useContext } from 'react';
 /**
  * Minimal studio state — shared between Explorer, Viewport, Properties.
  */
+export interface TerrainConfig {
+  width: number;
+  depth: number;
+  subdivisions: number;
+  maxHeight: number;
+  seed: number;
+  noiseScale: number;
+  octaves: number;
+}
+
 export interface EntityData {
   id: string;
   name: string;
@@ -19,15 +29,7 @@ export interface EntityData {
     isStatic: boolean;
   };
   dimensions?: { width: number; height: number; depth: number };
-  terrain?: {
-    width: number;
-    depth: number;
-    subdivisions: number;
-    maxHeight: number;
-    seed: number;
-    noiseScale: number;
-    octaves: number;
-  };
+  terrain?: TerrainConfig;
 }
 
 export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings';
@@ -59,6 +61,7 @@ export interface StudioActions {
   stopScript: () => void;
   addLog: (msg: string) => void;
   clearLogs: () => void;
+  resetScene: () => void;
 }
 
 export type StudioContextType = StudioState & StudioActions;

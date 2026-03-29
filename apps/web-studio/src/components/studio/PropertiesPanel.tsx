@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { useStudio } from '@/store/studio-store';
 import { PanelSection, PanelSlider, PanelInput, PanelToggle, PanelColorSwatches } from '@/components/ui/panel-controls';
+import { getTerrainPresets, saveTerrainPreset, BUILT_IN_PRESETS } from '@/store/storage';
 
 export function PropertiesPanel() {
   const { entities, selectedEntityId, updateEntity } = useStudio();
   const entity = entities.find((e) => e.id === selectedEntityId);
+  const [presets, setPresets] = useState(() => getTerrainPresets());
+  const builtInNames = new Set(BUILT_IN_PRESETS.map(p => p.name));
 
   return (
     <aside className="w-[320px] flex-shrink-0 overflow-visible">
@@ -120,6 +124,48 @@ export function PropertiesPanel() {
                   onChange={(v) => updateEntity(entity.id, { physics: { ...entity.physics!, isStatic: v } })}
                   description="Fixed in place"
                 />
+              </PanelSection>
+            )}
+
+            {/* Terrain Presets */}
+            {entity.terrain && (
+              <PanelSection title="Presets" collapsible>
+                <div className="space-y-2">
+                  <select
+                    className="w-full bg-[#2a2a2a] text-white text-sm px-3 py-2 rounded-lg border border-white/10"
+                    value=""
+                    onChange={(e) => {
+                      const preset = presets.find(p => p.name === e.target.value);
+                      if (preset) updateEntity(entity.id, { terrain: { ...preset.terrain } });
+                    }}
+                  >
+                    <option value="" disabled>Load preset...</option>
+                    <optgroup label="Built-in">
+                      {presets.filter(p => builtInNames.has(p.name)).map(p => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
+                      ))}
+                    </optgroup>
+                    {presets.some(p => !builtInNames.has(p.name)) && (
+                      <optgroup label="My Presets">
+                        {presets.filter(p => !builtInNames.has(p.name)).map(p => (
+                          <option key={p.name} value={p.name}>{p.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <button
+                    className="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+                    onClick={() => {
+                      const name = window.prompt('Preset name:');
+                      if (name && entity.terrain) {
+                        saveTerrainPreset({ name, terrain: { ...entity.terrain } });
+                        setPresets(getTerrainPresets());
+                      }
+                    }}
+                  >
+                    Save As Preset
+                  </button>
+                </div>
               </PanelSection>
             )}
 

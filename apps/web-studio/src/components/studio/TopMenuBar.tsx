@@ -15,6 +15,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { useStudio } from '@/store/studio-store';
+import { saveScene } from '@/store/storage';
 
 interface MenuItem {
   id: string;
@@ -51,7 +52,7 @@ export function TopMenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [hoverMode, setHoverMode] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
-  const { isPlaying, setPlaying, addEntity, marketplaceOpen, toggleMarketplace } = useStudio();
+  const { isPlaying, setPlaying, addEntity, entities, addLog, resetScene, marketplaceOpen, toggleMarketplace } = useStudio();
 
   let entityCounter = 10;
   const insertEntity = (shape: 'box' | 'sphere' | 'cylinder') => {
@@ -97,6 +98,19 @@ export function TopMenuBar() {
     return () => document.removeEventListener('keydown', handler);
   }, [openMenu]);
 
+  // Cmd+S to save
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        saveScene(entities);
+        addLog('[system] Scene saved');
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [entities, addLog]);
+
   const handleMenuClick = useCallback((menuId: string) => {
     setOpenMenu((prev) => {
       if (prev === menuId) {
@@ -135,9 +149,9 @@ export function TopMenuBar() {
       id: 'file',
       label: 'File',
       items: [
-        { id: 'new', label: 'New Simulation', icon: FileCode, onClick: () => {} },
+        { id: 'new', label: 'New Simulation', icon: FileCode, onClick: () => resetScene() },
         { separator: true },
-        { id: 'save', label: 'Save', icon: Save, shortcut: '\u2318S', onClick: () => {} },
+        { id: 'save', label: 'Save', icon: Save, shortcut: '\u2318S', onClick: () => { saveScene(entities); addLog('[system] Scene saved'); } },
         { id: 'publish', label: 'Publish to Marketplace', icon: Upload, onClick: () => {} },
       ],
     },

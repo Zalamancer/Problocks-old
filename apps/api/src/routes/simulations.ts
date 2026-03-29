@@ -78,6 +78,7 @@ simulationsRouter.get('/:slug', (c) => {
       ...sim,
       rating: sim.rating_count > 0 ? (sim.rating_sum / sim.rating_count).toFixed(1) : null,
       capabilities: JSON.parse(sim.capabilities),
+      scene_data: JSON.parse(sim.scene_data || '{}'),
       versions,
     },
   });
@@ -108,9 +109,9 @@ simulationsRouter.post('/:slug/fork', async (c) => {
   const forkName = `${original.name} (Fork)`;
 
   db.prepare(`
-    INSERT INTO simulations (id, user_id, name, slug, description, category, version, capabilities, source_code, forked_from)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, userId, forkName, forkSlug, original.description, original.category, '1.0.0', original.capabilities, original.source_code, original.id);
+    INSERT INTO simulations (id, user_id, name, slug, description, category, version, capabilities, source_code, scene_data, forked_from)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, userId, forkName, forkSlug, original.description, original.category, '1.0.0', original.capabilities, original.source_code, original.scene_data ?? '{}', original.id);
 
   // Increment fork count on original
   db.prepare(`UPDATE simulations SET fork_count = fork_count + 1 WHERE id = ?`).run(original.id);
@@ -190,6 +191,7 @@ simulationsRouter.get('/:slug/download', (c) => {
     files: {
       'src/index.ts': sim.source_code,
     },
+    scene_data: JSON.parse(sim.scene_data || '{}'),
   });
 });
 
@@ -197,7 +199,7 @@ simulationsRouter.get('/:slug/download', (c) => {
 simulationsRouter.put('/:slug', async (c) => {
   const slug = c.req.param('slug');
   const body = await c.req.json();
-  const { source_code, version, changelog } = body;
+  const { source_code, version, changelog, scene_data } = body;
 
   if (!source_code) return c.json({ error: 'source_code required' }, 400);
 
@@ -215,8 +217,8 @@ simulationsRouter.put('/:slug', async (c) => {
 
   // Update the simulation
   db.prepare(`
-    UPDATE simulations SET source_code = ?, version = ?, updated_at = datetime('now') WHERE slug = ?
-  `).run(source_code, newVersion, slug);
+    UPDATE simulations SET source_code = ?, version = ?, scene_data = ?, updated_at = datetime('now') WHERE slug = ?
+  `).run(source_code, newVersion, JSON.stringify(scene_data ?? {}), slug);
 
   db.close();
   return c.json({ slug, version: newVersion });
@@ -392,7 +394,7 @@ simulationsRouter.get('/user/:userId/favorites', (c) => {
 // POST /simulations — publish a new simulation
 simulationsRouter.post('/', async (c) => {
   const body = await c.req.json();
-  const { name, description, category, source_code, version } = body;
+  const { name, description, category, source_code, version, scene_data } = body;
 
   if (!name || !source_code) {
     return c.json({ error: 'name and source_code required' }, 400);
@@ -405,9 +407,9 @@ simulationsRouter.post('/', async (c) => {
   const userId = db.prepare(`SELECT id FROM users LIMIT 1`).get() as any;
 
   db.prepare(`
-    INSERT INTO simulations (id, user_id, name, slug, description, category, version, source_code)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, userId.id, name, slug, description ?? '', category ?? 'general', version ?? '1.0.0', source_code);
+    INSERT INTO simulations (id, user_id, name, slug, description, category, version, source_code, scene_data)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, userId.id, name, slug, description ?? '', category ?? 'general', version ?? '1.0.0', source_code, JSON.stringify(scene_data ?? {}));
 
   // Create version record
   db.prepare(`

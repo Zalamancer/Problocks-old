@@ -41,6 +41,7 @@ export function initDb(): void {
       thumbnail_url TEXT DEFAULT '',
       entry_file TEXT DEFAULT 'src/index.ts',
       source_code TEXT DEFAULT '',
+      scene_data TEXT DEFAULT '{}',
       forked_from TEXT REFERENCES simulations(id),
       fork_count INTEGER DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'published',
@@ -153,6 +154,11 @@ export function initDb(): void {
     CREATE INDEX IF NOT EXISTS idx_simulations_plays ON simulations(plays DESC);
     CREATE INDEX IF NOT EXISTS idx_simulations_user ON simulations(user_id);
   `);
+
+  // Migration: add scene_data column if DB already existed
+  try {
+    db.exec(`ALTER TABLE simulations ADD COLUMN scene_data TEXT DEFAULT '{}'`);
+  } catch { /* column already exists */ }
 
   db.close();
 }

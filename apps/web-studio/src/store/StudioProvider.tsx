@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { StudioContext, DEFAULT_ENTITIES, type EntityData, type LeftPanelGroup, type LeftPanelTab } from './studio-store';
+import { saveScene, loadScene, clearScene } from './storage';
 import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import type { QuickJSRuntime } from '@problocks/engine/scripting/quickjs-runtime';
 
 export function StudioProvider({ children }: { children: ReactNode }) {
-  const [entities, setEntities] = useState<EntityData[]>(DEFAULT_ENTITIES);
+  const [entities, setEntities] = useState<EntityData[]>(() => loadScene() ?? DEFAULT_ENTITIES);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>('ball');
   const [isPlaying, setIsPlaying] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
@@ -79,6 +80,17 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const clearLogs = useCallback(() => {
     setConsoleLogs([]);
   }, []);
+
+  const resetScene = useCallback(() => {
+    clearScene();
+    setEntities(DEFAULT_ENTITIES);
+    setSelectedEntityId(null);
+  }, []);
+
+  // Auto-persist scene to localStorage
+  useEffect(() => {
+    saveScene(entities);
+  }, [entities]);
 
   const runScript = useCallback(async (code: string) => {
     // Get sim from viewport (registered on window)
@@ -172,6 +184,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     stopScript,
     addLog,
     clearLogs,
+    resetScene,
     _simRef: simRef,
   };
 
