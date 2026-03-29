@@ -99,6 +99,25 @@ export function Viewport() {
         }
       };
 
+      // Two-finger scroll → orbit in all directions, pinch → zoom
+      const cam = scene.activeCamera as any;
+      canvas!.addEventListener('wheel', (e: WheelEvent) => {
+        e.preventDefault();
+
+        if (e.ctrlKey) {
+          // Pinch-to-zoom (trackpad sends ctrlKey + deltaY for pinch)
+          const zoomDelta = e.deltaY * 0.01;
+          cam.radius = Math.max(
+            cam.lowerRadiusLimit ?? 2,
+            Math.min(cam.upperRadiusLimit ?? 100, cam.radius * (1 + zoomDelta)),
+          );
+        } else {
+          // Two-finger scroll → orbit camera
+          if (e.deltaX !== 0) cam.alpha += e.deltaX * 0.008;
+          if (e.deltaY !== 0) cam.beta += e.deltaY * 0.008;
+        }
+      }, { passive: false });
+
       // Start render loop (physics only starts when Play is clicked)
       renderer.startRenderLoop();
     }
@@ -129,9 +148,33 @@ export function Viewport() {
     }
   }, [isPlaying]);
 
+  // Sync selected entity transform from store → engine when properties change
+  useEffect(() => {
+    if (!engineRef.current || !ready || isPlaying || !selectedEntityId) return;
+    const entity = entities.find(e => e.id === selectedEntityId);
+    if (entity?.shape) {
+      try {
+        engineRef.current.sim.setEntityPosition(entity.id, entity.position);
+      } catch {
+        // Engine may not have this entity yet
+      }
+    }
+  }, [entities, selectedEntityId, ready, isPlaying]);
+
+  // Attach/detach gizmo when selection changes
+  useEffect(() => {
+    if (!engineRef.current || !ready) return;
+    const renderer = engineRef.current.renderer;
+    if (selectedEntityId) {
+      renderer.attachGizmo(selectedEntityId);
+    } else {
+      renderer.detachGizmo();
+    }
+  }, [selectedEntityId, ready]);
+
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-black">
-      <canvas ref={canvasRef} className="h-full w-full" />
+      <canvas ref={canvasRef} className="h-full w-full touch-none" />
       {/* Viewport overlay */}
       <div className="absolute bottom-2 left-2 flex gap-2">
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">

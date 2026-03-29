@@ -34,8 +34,8 @@ function EntityItem({ entity }: { entity: EntityData }) {
 
   return (
     <div
-      className={`flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-sm ${
-        isSelected ? 'bg-primary/20 text-primary-foreground' : 'hover:bg-accent'
+      className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm ${
+        isSelected ? 'bg-green-500/15 text-green-400' : 'text-zinc-300 hover:bg-white/[0.06]'
       }`}
       style={{ paddingLeft: '32px' }}
       onClick={() => selectEntity(entity.id)}
@@ -57,14 +57,14 @@ function FolderItem({ label, icon, children, defaultOpen = true }: {
   return (
     <div>
       <div
-        className="flex cursor-pointer items-center gap-1 rounded-sm px-1 py-1 text-sm hover:bg-accent"
+        className="flex cursor-pointer items-center gap-1 rounded-md px-1 py-1 text-sm text-zinc-300 hover:bg-white/[0.06]"
         style={{ paddingLeft: '16px' }}
         onClick={() => setOpen(!open)}
       >
         {open ? (
-          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <ChevronDown className="h-3 w-3 shrink-0 text-zinc-500" />
         ) : (
-          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+          <ChevronRight className="h-3 w-3 shrink-0 text-zinc-500" />
         )}
         {icon}
         <span>{label}</span>
@@ -79,19 +79,11 @@ export function ExplorerPanel() {
   const sceneEntities = entities.filter(e => e.type === 'entity');
 
   return (
-    <div className="flex h-full flex-col border-r bg-card">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Explorer
-        </span>
-        <Badge variant="secondary" className="text-[10px]">
-          {entities.length}
-        </Badge>
-      </div>
+    <div className="flex h-full flex-col">
       <ScrollArea className="flex-1 p-1">
         {/* World root */}
         <div className="flex items-center gap-1 rounded-sm px-1 py-1 text-sm">
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          <ChevronDown className="h-3 w-3 text-zinc-500" />
           <Globe className="h-4 w-4 text-blue-400" />
           <span className="font-medium">World</span>
         </div>
@@ -111,17 +103,17 @@ export function ExplorerPanel() {
         >
           <div className="flex items-center gap-1.5 px-2 py-1 text-sm" style={{ paddingLeft: '32px' }}>
             <Lightbulb className="h-4 w-4 text-yellow-300" />
-            <span className="text-muted-foreground">Hemisphere Light</span>
+            <span className="text-zinc-500">Hemisphere Light</span>
           </div>
           <div className="flex items-center gap-1.5 px-2 py-1 text-sm" style={{ paddingLeft: '32px' }}>
             <Lightbulb className="h-4 w-4 text-orange-300" />
-            <span className="text-muted-foreground">Directional Light</span>
+            <span className="text-zinc-500">Directional Light</span>
           </div>
         </FolderItem>
 
         <div className="flex items-center gap-1.5 px-2 py-1 text-sm" style={{ paddingLeft: '16px' }}>
           <Camera className="h-4 w-4 text-purple-400" />
-          <span className="text-muted-foreground">Camera</span>
+          <span className="text-zinc-500">Camera</span>
         </div>
 
         <FolderItem
@@ -130,7 +122,7 @@ export function ExplorerPanel() {
         >
           <div className="flex items-center gap-1.5 px-2 py-1 text-sm" style={{ paddingLeft: '32px' }}>
             <FileCode className="h-4 w-4 text-green-400" />
-            <span className="text-muted-foreground">main.ts</span>
+            <span className="text-zinc-500">main.ts</span>
           </div>
         </FolderItem>
       </ScrollArea>

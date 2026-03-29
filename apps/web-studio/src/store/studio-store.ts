@@ -21,6 +21,9 @@ export interface EntityData {
   dimensions?: { width: number; height: number; depth: number };
 }
 
+export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings';
+export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings';
+
 export interface StudioState {
   entities: EntityData[];
   selectedEntityId: string | null;
@@ -28,6 +31,9 @@ export interface StudioState {
   consoleLogs: string[];
   scriptRunning: boolean;
   marketplaceOpen: boolean;
+  leftPanelCollapsed: boolean;
+  leftPanelActiveGroup: LeftPanelGroup;
+  leftPanelActiveTab: LeftPanelTab;
 }
 
 export interface StudioActions {
@@ -37,6 +43,9 @@ export interface StudioActions {
   removeEntity: (id: string) => void;
   setPlaying: (playing: boolean) => void;
   toggleMarketplace: () => void;
+  toggleLeftPanel: () => void;
+  setLeftPanelGroup: (group: LeftPanelGroup) => void;
+  setLeftPanelTab: (tab: LeftPanelTab) => void;
   runScript: (code: string) => void;
   stopScript: () => void;
   addLog: (msg: string) => void;

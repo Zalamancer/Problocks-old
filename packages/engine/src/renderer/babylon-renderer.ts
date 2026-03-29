@@ -1,6 +1,7 @@
 import * as BABYLON from '@babylonjs/core';
 import { GridMaterial } from '@babylonjs/materials';
 import { Renderer, type RendererOptions } from './renderer.js';
+import { UnifiedGizmo } from './unified-gizmo.js';
 
 interface MeshEntry {
   mesh: BABYLON.AbstractMesh;
@@ -17,6 +18,8 @@ export class BabylonRenderer extends Renderer {
   private scene!: BABYLON.Scene;
   private camera!: BABYLON.ArcRotateCamera;
   private meshes: Map<string, MeshEntry> = new Map();
+  private gizmo: UnifiedGizmo | null = null;
+  private attachedGizmoEntityId: string | null = null;
 
   async init(options: RendererOptions): Promise<void> {
     const canvas = options.canvas;
@@ -43,6 +46,9 @@ export class BabylonRenderer extends Renderer {
     this.camera.lowerRadiusLimit = 2;
     this.camera.upperRadiusLimit = 100;
     this.camera.wheelPrecision = 20;
+
+    // Disable default wheel zoom — Viewport handles wheel events for pan/zoom
+    this.camera.inputs.removeByType('ArcRotateCameraMouseWheelInput');
 
     // Lights
     const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), this.scene);
@@ -146,4 +152,31 @@ export class BabylonRenderer extends Renderer {
   handleResize(): void { this.engine.resize(); }
 
   getScene(): BABYLON.Scene { return this.scene; }
+
+  getMesh(entityId: string): BABYLON.AbstractMesh | null {
+    return this.meshes.get(entityId)?.mesh ?? null;
+  }
+
+  attachGizmo(entityId: string): void {
+    const entry = this.meshes.get(entityId);
+    if (!entry) return;
+
+    if (!this.gizmo) {
+      this.gizmo = new UnifiedGizmo(this.scene);
+    }
+
+    this.gizmo.attach(entry.mesh);
+    this.attachedGizmoEntityId = entityId;
+  }
+
+  detachGizmo(): void {
+    if (this.gizmo) {
+      this.gizmo.detach();
+    }
+    this.attachedGizmoEntityId = null;
+  }
+
+  getAttachedGizmoEntityId(): string | null {
+    return this.attachedGizmoEntityId;
+  }
 }

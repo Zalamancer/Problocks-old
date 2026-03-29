@@ -1,220 +1,130 @@
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { useStudio } from '@/store/studio-store';
+import { PanelSection, PanelSlider, PanelInput, PanelToggle, PanelColorSwatches } from '@/components/ui/panel-controls';
 
 export function PropertiesPanel() {
   const { entities, selectedEntityId, updateEntity } = useStudio();
-  const entity = entities.find(e => e.id === selectedEntityId);
-
-  if (!entity) {
-    return (
-      <div className="flex h-full flex-col border-l bg-card">
-        <div className="flex items-center border-b px-3 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Properties
-          </span>
-        </div>
-        <div className="flex flex-1 items-center justify-center p-4">
-          <span className="text-sm text-muted-foreground">Select an entity</span>
-        </div>
-      </div>
-    );
-  }
-
-  const updatePos = (axis: 'x' | 'y' | 'z', value: string) => {
-    const num = parseFloat(value);
-    if (isNaN(num)) return;
-    updateEntity(entity.id, { position: { ...entity.position, [axis]: num } });
-  };
-
-  const updateRot = (axis: 'x' | 'y' | 'z', value: string) => {
-    const num = parseFloat(value);
-    if (isNaN(num)) return;
-    updateEntity(entity.id, { rotation: { ...entity.rotation, [axis]: num } });
-  };
-
-  const updateScale = (axis: 'x' | 'y' | 'z', value: string) => {
-    const num = parseFloat(value);
-    if (isNaN(num)) return;
-    updateEntity(entity.id, { scale: { ...entity.scale, [axis]: num } });
-  };
+  const entity = entities.find((e) => e.id === selectedEntityId);
 
   return (
-    <div className="flex h-full flex-col border-l bg-card">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Properties
-        </span>
-        <Badge variant="outline" className="text-[10px]">
-          {entity.name}
-        </Badge>
+    <aside className="w-[320px] flex-shrink-0 overflow-visible">
+      <div className="h-full flex flex-col bg-zinc-900/80 backdrop-blur-xl border border-white/[0.06] rounded-xl overflow-hidden">
+        {/* Panel header */}
+        <div className="shrink-0 min-h-[49px] px-4 py-2 border-b border-white/5 flex items-center justify-between">
+          <span className="text-[13px] font-medium text-zinc-200">Properties</span>
+          {entity && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">
+              {entity.name}
+            </span>
+          )}
+        </div>
+
+        {/* Panel body */}
+        {!entity ? (
+          <div className="flex-1 flex items-center justify-center">
+            <span className="text-[13px] text-zinc-500">Select an entity</span>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+            {/* General */}
+            <PanelSection title="General" collapsible>
+              <PanelInput
+                label="Name"
+                value={entity.name}
+                onChange={(v) => updateEntity(entity.id, { name: v })}
+              />
+            </PanelSection>
+
+            {/* Transform — PartTransformControls layout: label w-16 + inline pills in a row */}
+            <PanelSection title="Transform" collapsible>
+              {/* Position: label + X Y Z inline pills */}
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-gray-400 text-sm shrink-0 w-16">Position</span>
+                <div className="flex-1 flex gap-1.5">
+                  <PanelSlider label="" value={entity.position.x} onChange={(v) => updateEntity(entity.id, { position: { ...entity.position, x: v } })} min={-50} max={50} step={0.1} precision={2} inline className="flex-1" />
+                  <PanelSlider label="" value={entity.position.y} onChange={(v) => updateEntity(entity.id, { position: { ...entity.position, y: v } })} min={-50} max={50} step={0.1} precision={2} inline className="flex-1" />
+                  <PanelSlider label="" value={entity.position.z} onChange={(v) => updateEntity(entity.id, { position: { ...entity.position, z: v } })} min={-50} max={50} step={0.1} precision={2} inline className="flex-1" />
+                </div>
+              </div>
+
+              {/* Rotation: label + X Y Z inline pills */}
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-gray-400 text-sm shrink-0 w-16">Rotation</span>
+                <div className="flex-1 flex gap-1.5">
+                  <PanelSlider label="" value={entity.rotation.x} onChange={(v) => updateEntity(entity.id, { rotation: { ...entity.rotation, x: v } })} min={-180} max={180} step={1} precision={1} inline className="flex-1" />
+                  <PanelSlider label="" value={entity.rotation.y} onChange={(v) => updateEntity(entity.id, { rotation: { ...entity.rotation, y: v } })} min={-180} max={180} step={1} precision={1} inline className="flex-1" />
+                  <PanelSlider label="" value={entity.rotation.z} onChange={(v) => updateEntity(entity.id, { rotation: { ...entity.rotation, z: v } })} min={-180} max={180} step={1} precision={1} inline className="flex-1" />
+                </div>
+              </div>
+
+              {/* Scale: label + X Y Z inline pills */}
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-gray-400 text-sm shrink-0 w-16">Scale</span>
+                <div className="flex-1 flex gap-1.5">
+                  <PanelSlider label="" value={entity.scale.x} onChange={(v) => updateEntity(entity.id, { scale: { ...entity.scale, x: v } })} min={0.1} max={10} step={0.1} precision={2} inline className="flex-1" />
+                  <PanelSlider label="" value={entity.scale.y} onChange={(v) => updateEntity(entity.id, { scale: { ...entity.scale, y: v } })} min={0.1} max={10} step={0.1} precision={2} inline className="flex-1" />
+                  <PanelSlider label="" value={entity.scale.z} onChange={(v) => updateEntity(entity.id, { scale: { ...entity.scale, z: v } })} min={0.1} max={10} step={0.1} precision={2} inline className="flex-1" />
+                </div>
+              </div>
+            </PanelSection>
+
+            {/* Mesh */}
+            {entity.shape && (
+              <PanelSection title="Mesh" collapsible>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-gray-400 text-sm w-20 shrink-0">Shape</span>
+                  <div className="flex-1 bg-[#2a2a2a] text-white text-sm px-3 py-2 rounded-lg opacity-60">
+                    {entity.shape}
+                  </div>
+                </div>
+                <PanelColorSwatches
+                  label="Color"
+                  value={entity.color ?? '#ffffff'}
+                  onChange={(v) => updateEntity(entity.id, { color: v })}
+                />
+              </PanelSection>
+            )}
+
+            {/* Physics / RigidBody */}
+            {entity.physics && (
+              <PanelSection title="RigidBody" collapsible>
+                <PanelSlider
+                  label="Mass"
+                  value={entity.physics.mass}
+                  onChange={(v) => updateEntity(entity.id, { physics: { ...entity.physics!, mass: v } })}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  precision={2}
+                />
+                <PanelSlider
+                  label="Friction"
+                  value={entity.physics.friction}
+                  onChange={(v) => updateEntity(entity.id, { physics: { ...entity.physics!, friction: v } })}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  precision={2}
+                />
+                <PanelSlider
+                  label="Bounce"
+                  value={entity.physics.restitution}
+                  onChange={(v) => updateEntity(entity.id, { physics: { ...entity.physics!, restitution: v } })}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  precision={2}
+                />
+                <PanelToggle
+                  label="Static"
+                  checked={entity.physics.isStatic}
+                  onChange={(v) => updateEntity(entity.id, { physics: { ...entity.physics!, isStatic: v } })}
+                  description="Fixed in place"
+                />
+              </PanelSection>
+            )}
+          </div>
+        )}
       </div>
-      <ScrollArea className="flex-1 p-3">
-        {/* Name */}
-        <div className="mb-3">
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Name
-          </label>
-          <Input
-            value={entity.name}
-            onChange={e => updateEntity(entity.id, { name: e.target.value })}
-            className="h-7 text-sm"
-          />
-        </div>
-
-        <Separator className="my-3" />
-
-        {/* Transform — Position */}
-        <div className="mb-3">
-          <h4 className="mb-2 text-xs font-semibold text-muted-foreground">Transform</h4>
-          <label className="mb-1 block text-[10px] text-muted-foreground">Position</label>
-          <div className="grid grid-cols-3 gap-1.5">
-            <div>
-              <label className="mb-0.5 block text-[10px] text-red-400">X</label>
-              <Input
-                value={entity.position.x.toFixed(2)}
-                onChange={e => updatePos('x', e.target.value)}
-                className="h-7 text-xs"
-              />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] text-green-400">Y</label>
-              <Input
-                value={entity.position.y.toFixed(2)}
-                onChange={e => updatePos('y', e.target.value)}
-                className="h-7 text-xs"
-              />
-            </div>
-            <div>
-              <label className="mb-0.5 block text-[10px] text-blue-400">Z</label>
-              <Input
-                value={entity.position.z.toFixed(2)}
-                onChange={e => updatePos('z', e.target.value)}
-                className="h-7 text-xs"
-              />
-            </div>
-          </div>
-
-          <label className="mb-1 mt-2 block text-[10px] text-muted-foreground">Rotation</label>
-          <div className="grid grid-cols-3 gap-1.5">
-            {(['x', 'y', 'z'] as const).map(axis => (
-              <Input
-                key={axis}
-                value={entity.rotation[axis].toFixed(2)}
-                onChange={e => updateRot(axis, e.target.value)}
-                className="h-7 text-xs"
-              />
-            ))}
-          </div>
-
-          <label className="mb-1 mt-2 block text-[10px] text-muted-foreground">Scale</label>
-          <div className="grid grid-cols-3 gap-1.5">
-            {(['x', 'y', 'z'] as const).map(axis => (
-              <Input
-                key={axis}
-                value={entity.scale[axis].toFixed(2)}
-                onChange={e => updateScale(axis, e.target.value)}
-                className="h-7 text-xs"
-              />
-            ))}
-          </div>
-        </div>
-
-        {entity.shape && (
-          <>
-            <Separator className="my-3" />
-            <div className="mb-3">
-              <h4 className="mb-2 text-xs font-semibold text-muted-foreground">Mesh</h4>
-              <div className="space-y-2">
-                <div>
-                  <label className="mb-0.5 block text-[10px] text-muted-foreground">Shape</label>
-                  <Input value={entity.shape} className="h-7 text-xs" disabled />
-                </div>
-                <div>
-                  <label className="mb-0.5 block text-[10px] text-muted-foreground">Color</label>
-                  <div className="flex gap-1.5">
-                    <div
-                      className="h-7 w-7 rounded border"
-                      style={{ backgroundColor: entity.color ?? '#fff' }}
-                    />
-                    <Input
-                      value={entity.color ?? '#ffffff'}
-                      onChange={e => updateEntity(entity.id, { color: e.target.value })}
-                      className="h-7 flex-1 text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {entity.physics && (
-          <>
-            <Separator className="my-3" />
-            <div className="mb-3">
-              <h4 className="mb-2 text-xs font-semibold text-muted-foreground">RigidBody</h4>
-              <div className="space-y-2">
-                <div>
-                  <label className="mb-0.5 block text-[10px] text-muted-foreground">Mass</label>
-                  <Input
-                    value={entity.physics.mass.toFixed(2)}
-                    onChange={e => {
-                      const num = parseFloat(e.target.value);
-                      if (!isNaN(num)) {
-                        updateEntity(entity.id, { physics: { ...entity.physics!, mass: num } });
-                      }
-                    }}
-                    className="h-7 text-xs"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <label className="mb-0.5 block text-[10px] text-muted-foreground">Friction</label>
-                    <Input
-                      value={entity.physics.friction.toFixed(2)}
-                      onChange={e => {
-                        const num = parseFloat(e.target.value);
-                        if (!isNaN(num)) {
-                          updateEntity(entity.id, { physics: { ...entity.physics!, friction: num } });
-                        }
-                      }}
-                      className="h-7 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-0.5 block text-[10px] text-muted-foreground">Restitution</label>
-                    <Input
-                      value={entity.physics.restitution.toFixed(2)}
-                      onChange={e => {
-                        const num = parseFloat(e.target.value);
-                        if (!isNaN(num)) {
-                          updateEntity(entity.id, { physics: { ...entity.physics!, restitution: num } });
-                        }
-                      }}
-                      className="h-7 text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="static"
-                    checked={entity.physics.isStatic}
-                    onChange={e => {
-                      updateEntity(entity.id, { physics: { ...entity.physics!, isStatic: e.target.checked } });
-                    }}
-                    className="rounded"
-                  />
-                  <label htmlFor="static" className="text-xs text-muted-foreground">Static</label>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </ScrollArea>
-    </div>
+    </aside>
   );
 }

@@ -87,6 +87,17 @@ export class SimulationLoop {
     this.renderer.removeMesh(entityId);
   }
 
+  /**
+   * Set entity position from the UI (updates both physics body and visual mesh).
+   */
+  setEntityPosition(entityId: string, position: { x: number; y: number; z: number }): void {
+    const bodyId = this.entityToBody.get(entityId);
+    if (bodyId) {
+      this.physics.setBodyPosition(bodyId, position);
+    }
+    this.renderer.updateMeshTransform(entityId, position);
+  }
+
   applyForce(entityId: string, force: { x: number; y: number; z: number }): void {
     const bodyId = this.entityToBody.get(entityId);
     if (bodyId) {

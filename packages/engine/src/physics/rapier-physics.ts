@@ -122,6 +122,12 @@ export class RapierPhysics extends PhysicsEngine {
     };
   }
 
+  setBodyPosition(id: string, position: { x: number; y: number; z: number }): void {
+    const entry = this.bodies.get(id);
+    if (!entry) return;
+    entry.rigidBody.setTranslation(new RAPIER.Vector3(position.x, position.y, position.z), true);
+  }
+
   applyForce(id: string, force: { x: number; y: number; z: number }): void {
     const entry = this.bodies.get(id);
     if (!entry) return;

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react';
-import { StudioContext, DEFAULT_ENTITIES, type EntityData } from './studio-store';
+import { StudioContext, DEFAULT_ENTITIES, type EntityData, type LeftPanelGroup, type LeftPanelTab } from './studio-store';
 import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import type { QuickJSRuntime } from '@problocks/engine/scripting/quickjs-runtime';
 
@@ -10,6 +10,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const [scriptRunning, setScriptRunning] = useState(false);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [leftPanelActiveGroup, setLeftPanelActiveGroup] = useState<LeftPanelGroup>('scene');
+  const [leftPanelActiveTab, setLeftPanelActiveTab] = useState<LeftPanelTab>('scene');
   const simRef = useRef<SimulationLoop | null>(null);
   const sandboxRef = useRef<QuickJSRuntime | null>(null);
 
@@ -46,6 +49,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const toggleMarketplace = useCallback(() => {
     setMarketplaceOpen(prev => !prev);
+  }, []);
+
+  const toggleLeftPanel = useCallback(() => {
+    setLeftPanelCollapsed(prev => !prev);
+  }, []);
+
+  const setLeftPanelGroup = useCallback((group: LeftPanelGroup) => {
+    setLeftPanelActiveGroup(group);
+    setLeftPanelActiveTab(group);
+  }, []);
+
+  const setLeftPanelTab = useCallback((tab: LeftPanelTab) => {
+    setLeftPanelActiveTab(tab);
   }, []);
 
   const setPlaying = useCallback((playing: boolean) => {
@@ -95,19 +111,19 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       const { QuickJSRuntime } = await import('@problocks/engine/scripting/quickjs-runtime');
       const sandbox = new QuickJSRuntime();
       await sandbox.init({ maxFrameMs: 100, maxMemoryBytes: 10 * 1024 * 1024, maxApiCallsPerSec: 60 });
-      sandbox.bindSimulation(simRef.current);
+      sandbox.bindSimulation(simRef.current!);
       sandboxRef.current = sandbox;
 
       // Load and execute the student code
       await sandbox.loadSimulation(code);
 
       // Wire tick
-      simRef.current.onFrame((dt) => {
+      simRef.current!.onFrame((dt) => {
         if (sandboxRef.current) sandboxRef.current.callTick(dt);
       });
 
       // Auto-start physics
-      simRef.current.start();
+      simRef.current!.start();
       setIsPlaying(true);
 
       addLog('--- Script running (physics started) ---');
@@ -140,12 +156,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     consoleLogs,
     scriptRunning,
     marketplaceOpen,
+    leftPanelCollapsed,
+    leftPanelActiveGroup,
+    leftPanelActiveTab,
     selectEntity,
     updateEntity,
     addEntity,
     removeEntity,
     setPlaying,
     toggleMarketplace,
+    toggleLeftPanel,
+    setLeftPanelGroup,
+    setLeftPanelTab,
     runScript,
     stopScript,
     addLog,

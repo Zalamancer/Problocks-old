@@ -160,7 +160,7 @@ export function ScriptEditor() {
   }, []);
 
   return (
-    <div className="flex h-full flex-col border-t bg-card">
+    <div className="flex h-full flex-col">
       {/* Tab bar */}
       <div className="flex h-9 items-center border-b bg-[#1e1e1e] px-1">
         <Tabs defaultValue="main" className="h-full">
