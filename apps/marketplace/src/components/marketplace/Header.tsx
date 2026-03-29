@@ -89,9 +89,10 @@ export function Header({ search, onSearch }: HeaderProps) {
                 <div className="px-2 py-1.5 text-sm font-medium">{user.display_name}</div>
                 <div className="px-2 pb-1.5 text-xs text-muted-foreground">@{user.username}</div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>My Simulations</DropdownMenuItem>
-                <DropdownMenuItem>Earnings</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(`/user/${user.username}`)}>My Profile</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/dashboard')}>Dashboard & Earnings</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/classrooms')}>Classrooms</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/settings')}>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>Sign Out</DropdownMenuItem>
               </DropdownMenuContent>

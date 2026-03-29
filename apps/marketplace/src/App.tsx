@@ -8,6 +8,8 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ClassroomPage } from './pages/ClassroomPage';
 import { DocsPage } from './pages/DocsPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export function App() {
   return (
@@ -20,6 +22,8 @@ export function App() {
           <Route path="/play/:slug" element={<PlayPage />} />
           <Route path="/user/:username" element={<ProfilePage />} />
           <Route path="/classrooms" element={<ClassroomPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />

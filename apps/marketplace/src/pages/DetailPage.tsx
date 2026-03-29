@@ -175,6 +175,11 @@ export function DetailPage() {
 
             <Separator />
 
+            {/* Reviews section */}
+            <ReviewSection slug={slug!} sim={sim} />
+
+            <Separator />
+
             {/* Source code preview */}
             <div>
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Source Code</h2>
@@ -298,6 +303,122 @@ export function DetailPage() {
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+// ===== Review Section Component =====
+
+function ReviewSection({ slug, sim }: { slug: string; sim: Simulation }) {
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [myScore, setMyScore] = useState(0);
+  const [myReview, setMyReview] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [hoverStar, setHoverStar] = useState(0);
+
+  const stored = localStorage.getItem('pb_user');
+  const user = stored ? JSON.parse(stored) : null;
+
+  useEffect(() => {
+    fetch(`${API_BASE}/simulations/${slug}/reviews`)
+      .then(r => r.json())
+      .then(data => setReviews(data.reviews ?? []))
+      .catch(() => {});
+  }, [slug, submitted]);
+
+  const handleSubmit = async () => {
+    if (!user || myScore === 0) return;
+    await fetch(`${API_BASE}/simulations/${slug}/rate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id, score: myScore, review: myReview }),
+    });
+    setSubmitted(true);
+    setMyReview('');
+  };
+
+  return (
+    <div>
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        Reviews
+      </h2>
+
+      {/* Submit review */}
+      {user && !submitted && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-1 mb-2">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button
+                  key={star}
+                  className="p-0.5"
+                  onMouseEnter={() => setHoverStar(star)}
+                  onMouseLeave={() => setHoverStar(0)}
+                  onClick={() => setMyScore(star)}
+                >
+                  <Star className={`h-5 w-5 ${
+                    star <= (hoverStar || myScore)
+                      ? 'fill-yellow-500 text-yellow-500'
+                      : 'text-gray-600'
+                  }`} />
+                </button>
+              ))}
+              {myScore > 0 && <span className="text-xs text-muted-foreground ml-2">{myScore}/5</span>}
+            </div>
+            <textarea
+              className="w-full rounded-md border bg-background p-2 text-sm resize-none"
+              rows={2}
+              placeholder="Write a review (optional)..."
+              value={myReview}
+              onChange={e => setMyReview(e.target.value)}
+            />
+            <Button size="sm" className="mt-2" onClick={handleSubmit} disabled={myScore === 0}>
+              Submit Review
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {submitted && (
+        <p className="text-sm text-green-400 mb-4">Thanks for your review!</p>
+      )}
+
+      {!user && (
+        <p className="text-sm text-muted-foreground mb-4">
+          <Link to="/login" className="text-primary hover:underline">Sign in</Link> to leave a review.
+        </p>
+      )}
+
+      {/* Existing reviews */}
+      {reviews.length > 0 ? (
+        <div className="space-y-3">
+          {reviews.map((r: any, i: number) => (
+            <div key={i} className="flex gap-3">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarFallback className="text-[10px] bg-muted">
+                  {r.display_name?.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) ?? '??'}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{r.display_name}</span>
+                  <div className="flex">
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Star key={s} className={`h-3 w-3 ${s <= r.score ? 'fill-yellow-500 text-yellow-500' : 'text-gray-600'}`} />
+                    ))}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(r.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">{r.review}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No reviews yet. Be the first!</p>
+      )}
     </div>
   );
 }

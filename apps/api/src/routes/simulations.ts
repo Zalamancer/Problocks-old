@@ -241,6 +241,63 @@ simulationsRouter.get('/:slug/versions', (c) => {
   return c.json({ versions });
 });
 
+// POST /simulations/:slug/rate — submit a rating/review
+simulationsRouter.post('/:slug/rate', async (c) => {
+  const slug = c.req.param('slug');
+  const { user_id, score, review } = await c.req.json();
+
+  if (!user_id || !score || score < 1 || score > 5) {
+    return c.json({ error: 'user_id and score (1-5) required' }, 400);
+  }
+
+  const db = getDb();
+  const sim: any = db.prepare(`SELECT id, user_id FROM simulations WHERE slug = ?`).get(slug);
+  if (!sim) { db.close(); return c.json({ error: 'Not found' }, 404); }
+
+  if (sim.user_id === user_id) {
+    db.close();
+    return c.json({ error: "You can't rate your own simulation" }, 400);
+  }
+
+  // Upsert rating
+  const existing: any = db.prepare(`SELECT id, score FROM ratings WHERE simulation_id = ? AND user_id = ?`).get(sim.id, user_id);
+
+  if (existing) {
+    // Update existing rating
+    const scoreDiff = score - existing.score;
+    db.prepare(`UPDATE ratings SET score = ?, review = ? WHERE id = ?`).run(score, review ?? '', existing.id);
+    db.prepare(`UPDATE simulations SET rating_sum = rating_sum + ? WHERE id = ?`).run(scoreDiff, sim.id);
+  } else {
+    // New rating
+    db.prepare(`INSERT INTO ratings (id, simulation_id, user_id, score, review) VALUES (?, ?, ?, ?, ?)`)
+      .run(nanoid(), sim.id, user_id, score, review ?? '');
+    db.prepare(`UPDATE simulations SET rating_sum = rating_sum + ?, rating_count = rating_count + 1 WHERE id = ?`)
+      .run(score, sim.id);
+  }
+
+  db.close();
+  return c.json({ ok: true });
+});
+
+// GET /simulations/:slug/reviews — get all reviews
+simulationsRouter.get('/:slug/reviews', (c) => {
+  const db = getDb();
+  const slug = c.req.param('slug');
+
+  const sim: any = db.prepare(`SELECT id FROM simulations WHERE slug = ?`).get(slug);
+  if (!sim) { db.close(); return c.json({ error: 'Not found' }, 404); }
+
+  const reviews = db.prepare(`
+    SELECT r.score, r.review, r.created_at, u.username, u.display_name
+    FROM ratings r JOIN users u ON r.user_id = u.id
+    WHERE r.simulation_id = ? AND r.review != ''
+    ORDER BY r.created_at DESC
+  `).all(sim.id);
+
+  db.close();
+  return c.json({ reviews });
+});
+
 // POST /simulations — publish a new simulation
 simulationsRouter.post('/', async (c) => {
   const body = await c.req.json();
