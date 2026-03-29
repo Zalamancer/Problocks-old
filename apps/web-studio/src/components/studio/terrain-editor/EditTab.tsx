@@ -5,18 +5,20 @@
  * Each tool type shows its relevant controls.
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { MaterialPicker } from './MaterialPicker';
 
 // ── Types ──────────────────────────────────────────────────────────
 
-export type BrushTool = 'draw' | 'sculpt' | 'smooth' | 'flatten' | 'paint';
+export type BrushTool = 'draw' | 'sculpt' | 'smooth' | 'flatten' | 'paint'
+  | 'select' | 'transform' | 'fill' | 'sealevel';
 export type BrushShapeUI = 'sphere' | 'box' | 'cylinder';
 export type FlattenModeUI = 'both' | 'erode' | 'grow';
 export type PaintModeUI = 'paint' | 'replace';
 export type DrawModeUI = 'add' | 'subtract';
 export type PivotUI = 'bottom' | 'center' | 'top';
+export type FillModeUI = 'fill' | 'replace';
 
 export interface EditTabState {
   tool: BrushTool;
@@ -31,6 +33,20 @@ export interface EditTabState {
   sourceMaterialId: number;
   pivot: PivotUI;
   snapToVoxel: boolean;
+  // Region tool state (Phase 6)
+  fillMode: FillModeUI;
+  fillMaterialId: number;
+  replaceSrcId: number;
+  replaceDstId: number;
+  transformX: number;
+  transformY: number;
+  transformZ: number;
+  transformRotY: number;
+  transformScaleX: number;
+  transformScaleY: number;
+  transformScaleZ: number;
+  mergeEmpty: boolean;
+  waterLevel: number;
 }
 
 // ── Section header (reused) ────────────────────────────────────────
@@ -83,12 +99,19 @@ function Slider({
 
 // ── Tool icons (simple text labels for now) ────────────────────────
 
-const TOOLS: { id: BrushTool; label: string; icon: string }[] = [
+const BRUSH_TOOLS: { id: BrushTool; label: string; icon: string }[] = [
   { id: 'draw',    label: 'Draw',    icon: 'D' },
   { id: 'sculpt',  label: 'Sculpt',  icon: 'S' },
   { id: 'smooth',  label: 'Smooth',  icon: '~' },
   { id: 'flatten', label: 'Flatten', icon: 'F' },
   { id: 'paint',   label: 'Paint',   icon: 'P' },
+];
+
+const REGION_TOOLS: { id: BrushTool; label: string; icon: string }[] = [
+  { id: 'select',    label: 'Select',    icon: '▢' },
+  { id: 'transform', label: 'Transform', icon: '⤡' },
+  { id: 'fill',      label: 'Fill',      icon: '▮' },
+  { id: 'sealevel',  label: 'Sea Level', icon: '≋' },
 ];
 
 const SHAPES: { id: BrushShapeUI; label: string }[] = [
@@ -128,6 +151,85 @@ function ToggleGroup<T extends string>({
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────
+
+const BRUSH_TOOL_SET = new Set<BrushTool>(['draw', 'sculpt', 'smooth', 'flatten', 'paint']);
+
+function isBrushTool(tool: BrushTool): boolean {
+  return BRUSH_TOOL_SET.has(tool);
+}
+
+// ── Checkbox ──────────────────────────────────────────────────────
+
+function Checkbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only"
+      />
+      <span
+        className={cn(
+          'shrink-0 w-3.5 h-3.5 rounded border transition-colors flex items-center justify-center',
+          checked
+            ? 'border-green-500 bg-green-500/20'
+            : 'border-zinc-600 bg-zinc-800',
+        )}
+      >
+        {checked && (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5L4.2 7.2L8 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </span>
+      <span className="text-[11px] text-zinc-300">{label}</span>
+    </label>
+  );
+}
+
+// ── Number input ──────────────────────────────────────────────────
+
+function NumberInput({
+  label,
+  value,
+  onChange,
+  step = 4,
+  min = -9999,
+  max = 9999,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+}) {
+  return (
+    <div>
+      <span className="text-[10px] text-zinc-500 block mb-0.5">{label}</span>
+      <input
+        type="number"
+        value={value}
+        step={step}
+        min={min}
+        max={max}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full px-1.5 py-1 text-[11px] rounded bg-zinc-800 border border-zinc-700 text-zinc-200 focus:border-blue-500 focus:outline-none"
+      />
+    </div>
+  );
+}
+
 // ── Props ──────────────────────────────────────────────────────────
 
 interface EditTabProps {
@@ -147,11 +249,11 @@ export function EditTab({ state, onChange }: EditTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* ── Tool selector ─────────────────────────── */}
+      {/* ── Brush tools ─────────────────────────────── */}
       <div>
-        <SectionHeader>Tool</SectionHeader>
+        <SectionHeader>Brush Tools</SectionHeader>
         <div className="flex gap-1">
-          {TOOLS.map((t) => (
+          {BRUSH_TOOLS.map((t) => (
             <button
               key={t.id}
               onClick={() => update('tool', t.id)}
@@ -170,164 +272,307 @@ export function EditTab({ state, onChange }: EditTabProps) {
         </div>
       </div>
 
-      {/* ── Brush shape ───────────────────────────── */}
+      {/* ── Region tools ─────────────────────────────── */}
       <div>
-        <SectionHeader>Brush Shape</SectionHeader>
-        <ToggleGroup options={SHAPES} value={state.shape} onChange={(v) => update('shape', v)} />
-      </div>
-
-      {/* ── Brush settings ────────────────────────── */}
-      <div>
-        <SectionHeader>Brush Settings</SectionHeader>
-        <div className="space-y-2.5">
-          <Slider
-            label="Size"
-            value={state.size}
-            min={4}
-            max={256}
-            step={4}
-            displayValue={`${state.size} units`}
-            onChange={(v) => update('size', v)}
-          />
-          {state.shape !== 'sphere' && (
-            <Slider
-              label="Height"
-              value={state.height}
-              min={4}
-              max={256}
-              step={4}
-              displayValue={`${state.height} units`}
-              onChange={(v) => update('height', v)}
-            />
-          )}
-          <Slider
-            label="Strength"
-            value={state.strength}
-            min={0.1}
-            max={1}
-            step={0.05}
-            displayValue={state.strength.toFixed(2)}
-            onChange={(v) => update('strength', v)}
-          />
+        <SectionHeader>Region Tools</SectionHeader>
+        <div className="flex gap-1">
+          {REGION_TOOLS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => update('tool', t.id)}
+              title={t.label}
+              className={cn(
+                'flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-md transition-colors',
+                state.tool === t.id
+                  ? 'bg-blue-500/15 text-blue-400'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]',
+              )}
+            >
+              <span className="text-[14px] font-mono font-bold leading-none">{t.icon}</span>
+              <span className="text-[9px]">{t.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ── Mode toggles (tool-specific) ──────────── */}
-      {state.tool === 'draw' && (
-        <div>
-          <SectionHeader>Draw Mode</SectionHeader>
-          <ToggleGroup
-            options={[
-              { id: 'add' as DrawModeUI, label: 'Add' },
-              { id: 'subtract' as DrawModeUI, label: 'Subtract' },
-            ]}
-            value={state.drawMode}
-            onChange={(v) => update('drawMode', v)}
-          />
-        </div>
-      )}
+      {/* ── Brush-specific settings ────────────────── */}
+      {isBrushTool(state.tool) && (
+        <>
+          {/* ── Brush shape ───────────────────────────── */}
+          <div>
+            <SectionHeader>Brush Shape</SectionHeader>
+            <ToggleGroup options={SHAPES} value={state.shape} onChange={(v) => update('shape', v)} />
+          </div>
 
-      {state.tool === 'sculpt' && (
-        <div>
-          <SectionHeader>Sculpt Mode</SectionHeader>
-          <ToggleGroup
-            options={[
-              { id: 'add' as DrawModeUI, label: 'Build Up' },
-              { id: 'subtract' as DrawModeUI, label: 'Carve' },
-            ]}
-            value={state.drawMode}
-            onChange={(v) => update('drawMode', v)}
-          />
-        </div>
-      )}
+          {/* ── Brush settings ────────────────────────── */}
+          <div>
+            <SectionHeader>Brush Settings</SectionHeader>
+            <div className="space-y-2.5">
+              <Slider
+                label="Size"
+                value={state.size}
+                min={4}
+                max={256}
+                step={4}
+                displayValue={`${state.size} units`}
+                onChange={(v) => update('size', v)}
+              />
+              {state.shape !== 'sphere' && (
+                <Slider
+                  label="Height"
+                  value={state.height}
+                  min={4}
+                  max={256}
+                  step={4}
+                  displayValue={`${state.height} units`}
+                  onChange={(v) => update('height', v)}
+                />
+              )}
+              <Slider
+                label="Strength"
+                value={state.strength}
+                min={0.1}
+                max={1}
+                step={0.05}
+                displayValue={state.strength.toFixed(2)}
+                onChange={(v) => update('strength', v)}
+              />
+            </div>
+          </div>
 
-      {state.tool === 'flatten' && (
-        <div>
-          <SectionHeader>Flatten Mode</SectionHeader>
-          <ToggleGroup
-            options={[
-              { id: 'both' as FlattenModeUI, label: 'Both' },
-              { id: 'erode' as FlattenModeUI, label: 'Erode' },
-              { id: 'grow' as FlattenModeUI, label: 'Grow' },
-            ]}
-            value={state.flattenMode}
-            onChange={(v) => update('flattenMode', v)}
-          />
-        </div>
-      )}
-
-      {state.tool === 'paint' && (
-        <div>
-          <SectionHeader>Paint Mode</SectionHeader>
-          <ToggleGroup
-            options={[
-              { id: 'paint' as PaintModeUI, label: 'Paint' },
-              { id: 'replace' as PaintModeUI, label: 'Replace' },
-            ]}
-            value={state.paintMode}
-            onChange={(v) => update('paintMode', v)}
-          />
-          {state.paintMode === 'replace' && (
-            <div className="mt-2">
-              <span className="text-[11px] text-zinc-400 block mb-1">Source Material</span>
-              <MaterialPicker
-                selectedId={state.sourceMaterialId}
-                onChange={(id) => update('sourceMaterialId', id)}
+          {/* ── Mode toggles (tool-specific) ──────────── */}
+          {state.tool === 'draw' && (
+            <div>
+              <SectionHeader>Draw Mode</SectionHeader>
+              <ToggleGroup
+                options={[
+                  { id: 'add' as DrawModeUI, label: 'Add' },
+                  { id: 'subtract' as DrawModeUI, label: 'Subtract' },
+                ]}
+                value={state.drawMode}
+                onChange={(v) => update('drawMode', v)}
               />
             </div>
           )}
-        </div>
+
+          {state.tool === 'sculpt' && (
+            <div>
+              <SectionHeader>Sculpt Mode</SectionHeader>
+              <ToggleGroup
+                options={[
+                  { id: 'add' as DrawModeUI, label: 'Build Up' },
+                  { id: 'subtract' as DrawModeUI, label: 'Carve' },
+                ]}
+                value={state.drawMode}
+                onChange={(v) => update('drawMode', v)}
+              />
+            </div>
+          )}
+
+          {state.tool === 'flatten' && (
+            <div>
+              <SectionHeader>Flatten Mode</SectionHeader>
+              <ToggleGroup
+                options={[
+                  { id: 'both' as FlattenModeUI, label: 'Both' },
+                  { id: 'erode' as FlattenModeUI, label: 'Erode' },
+                  { id: 'grow' as FlattenModeUI, label: 'Grow' },
+                ]}
+                value={state.flattenMode}
+                onChange={(v) => update('flattenMode', v)}
+              />
+            </div>
+          )}
+
+          {state.tool === 'paint' && (
+            <div>
+              <SectionHeader>Paint Mode</SectionHeader>
+              <ToggleGroup
+                options={[
+                  { id: 'paint' as PaintModeUI, label: 'Paint' },
+                  { id: 'replace' as PaintModeUI, label: 'Replace' },
+                ]}
+                value={state.paintMode}
+                onChange={(v) => update('paintMode', v)}
+              />
+              {state.paintMode === 'replace' && (
+                <div className="mt-2">
+                  <span className="text-[11px] text-zinc-400 block mb-1">Source Material</span>
+                  <MaterialPicker
+                    selectedId={state.sourceMaterialId}
+                    onChange={(id) => update('sourceMaterialId', id)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Material ──────────────────────────────── */}
+          {state.tool !== 'smooth' && (
+            <div>
+              <SectionHeader>Material</SectionHeader>
+              <MaterialPicker
+                selectedId={state.materialId}
+                onChange={(id) => update('materialId', id)}
+              />
+            </div>
+          )}
+
+          {/* ── Advanced ──────────────────────────────── */}
+          <div>
+            <SectionHeader>Advanced</SectionHeader>
+            <div className="space-y-2">
+              <ToggleGroup
+                options={[
+                  { id: 'bottom' as PivotUI, label: 'Bottom' },
+                  { id: 'center' as PivotUI, label: 'Center' },
+                  { id: 'top' as PivotUI, label: 'Top' },
+                ]}
+                value={state.pivot}
+                onChange={(v) => update('pivot', v)}
+              />
+              <Checkbox
+                checked={state.snapToVoxel}
+                onChange={(v) => update('snapToVoxel', v)}
+                label="Snap to Voxel Grid"
+              />
+            </div>
+          </div>
+        </>
       )}
 
-      {/* ── Material ──────────────────────────────── */}
-      {state.tool !== 'smooth' && (
+      {/* ── Select tool ──────────────────────────────── */}
+      {state.tool === 'select' && (
         <div>
-          <SectionHeader>Material</SectionHeader>
-          <MaterialPicker
-            selectedId={state.materialId}
-            onChange={(id) => update('materialId', id)}
-          />
+          <SectionHeader>Selection</SectionHeader>
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            Click and drag on terrain to create a selection box.
+          </p>
+          <div className="mt-2 space-y-1 text-[10px] text-zinc-500">
+            <div>Ctrl+C — Copy</div>
+            <div>Ctrl+X — Cut</div>
+            <div>Ctrl+V — Paste</div>
+            <div>Ctrl+D — Duplicate</div>
+            <div>Delete — Clear region</div>
+          </div>
         </div>
       )}
 
-      {/* ── Advanced ──────────────────────────────── */}
-      <div>
-        <SectionHeader>Advanced</SectionHeader>
-        <div className="space-y-2">
-          <ToggleGroup
-            options={[
-              { id: 'bottom' as PivotUI, label: 'Bottom' },
-              { id: 'center' as PivotUI, label: 'Center' },
-              { id: 'top' as PivotUI, label: 'Top' },
-            ]}
-            value={state.pivot}
-            onChange={(v) => update('pivot', v)}
-          />
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={state.snapToVoxel}
-              onChange={(e) => update('snapToVoxel', e.target.checked)}
-              className="sr-only"
+      {/* ── Transform tool ───────────────────────────── */}
+      {state.tool === 'transform' && (
+        <div className="space-y-3">
+          <div>
+            <SectionHeader>Position Offset</SectionHeader>
+            <div className="grid grid-cols-3 gap-1.5">
+              <NumberInput label="X" value={state.transformX} onChange={(v) => update('transformX', v)} />
+              <NumberInput label="Y" value={state.transformY} onChange={(v) => update('transformY', v)} />
+              <NumberInput label="Z" value={state.transformZ} onChange={(v) => update('transformZ', v)} />
+            </div>
+          </div>
+          <div>
+            <SectionHeader>Rotation (Y)</SectionHeader>
+            <ToggleGroup
+              options={[
+                { id: '0', label: '0' },
+                { id: '90', label: '90' },
+                { id: '180', label: '180' },
+                { id: '270', label: '270' },
+              ]}
+              value={String(state.transformRotY)}
+              onChange={(v) => update('transformRotY', Number(v))}
             />
-            <span
-              className={cn(
-                'shrink-0 w-3.5 h-3.5 rounded border transition-colors flex items-center justify-center',
-                state.snapToVoxel
-                  ? 'border-green-500 bg-green-500/20'
-                  : 'border-zinc-600 bg-zinc-800',
-              )}
-            >
-              {state.snapToVoxel && (
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2 5L4.2 7.2L8 3" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </span>
-            <span className="text-[11px] text-zinc-300">Snap to Voxel Grid</span>
-          </label>
+          </div>
+          <div>
+            <SectionHeader>Scale</SectionHeader>
+            <div className="grid grid-cols-3 gap-1.5">
+              <NumberInput label="X" value={state.transformScaleX} step={0.5} min={0.5} max={4} onChange={(v) => update('transformScaleX', v)} />
+              <NumberInput label="Y" value={state.transformScaleY} step={0.5} min={0.5} max={4} onChange={(v) => update('transformScaleY', v)} />
+              <NumberInput label="Z" value={state.transformScaleZ} step={0.5} min={0.5} max={4} onChange={(v) => update('transformScaleZ', v)} />
+            </div>
+          </div>
+          <Checkbox
+            checked={state.mergeEmpty}
+            onChange={(v) => update('mergeEmpty', v)}
+            label="Merge Empty (air overwrites)"
+          />
+          <button className="w-full py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">
+            Apply Transform
+          </button>
         </div>
-      </div>
+      )}
+
+      {/* ── Fill tool ────────────────────────────────── */}
+      {state.tool === 'fill' && (
+        <div className="space-y-3">
+          <div>
+            <SectionHeader>Fill Mode</SectionHeader>
+            <ToggleGroup
+              options={[
+                { id: 'fill' as FillModeUI, label: 'Fill' },
+                { id: 'replace' as FillModeUI, label: 'Replace' },
+              ]}
+              value={state.fillMode}
+              onChange={(v) => update('fillMode', v)}
+            />
+          </div>
+          {state.fillMode === 'fill' && (
+            <div>
+              <SectionHeader>Fill Material</SectionHeader>
+              <MaterialPicker
+                selectedId={state.fillMaterialId}
+                onChange={(id) => update('fillMaterialId', id)}
+              />
+            </div>
+          )}
+          {state.fillMode === 'replace' && (
+            <div className="space-y-2">
+              <div>
+                <span className="text-[11px] text-zinc-400 block mb-1">Source</span>
+                <MaterialPicker
+                  selectedId={state.replaceSrcId}
+                  onChange={(id) => update('replaceSrcId', id)}
+                />
+              </div>
+              <div>
+                <span className="text-[11px] text-zinc-400 block mb-1">Target</span>
+                <MaterialPicker
+                  selectedId={state.replaceDstId}
+                  onChange={(id) => update('replaceDstId', id)}
+                />
+              </div>
+            </div>
+          )}
+          <button className="w-full py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">
+            Apply {state.fillMode === 'fill' ? 'Fill' : 'Replace'}
+          </button>
+        </div>
+      )}
+
+      {/* ── Sea Level tool ───────────────────────────── */}
+      {state.tool === 'sealevel' && (
+        <div className="space-y-3">
+          <div>
+            <SectionHeader>Water Level</SectionHeader>
+            <Slider
+              label="Y Level"
+              value={state.waterLevel}
+              min={-256}
+              max={512}
+              step={4}
+              displayValue={`${state.waterLevel} units`}
+              onChange={(v) => update('waterLevel', v)}
+            />
+          </div>
+          <div className="flex gap-1.5">
+            <button className="flex-1 py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">
+              Create Sea
+            </button>
+            <button className="flex-1 py-1.5 text-[11px] font-medium rounded-md bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors">
+              Evaporate
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -348,5 +593,19 @@ export function defaultEditTabState(): EditTabState {
     sourceMaterialId: 1,
     pivot: 'center',
     snapToVoxel: false,
+    // Region tools
+    fillMode: 'fill',
+    fillMaterialId: 1,
+    replaceSrcId: 1,
+    replaceDstId: 3, // Rock
+    transformX: 0,
+    transformY: 0,
+    transformZ: 0,
+    transformRotY: 0,
+    transformScaleX: 1,
+    transformScaleY: 1,
+    transformScaleZ: 1,
+    mergeEmpty: false,
+    waterLevel: 64,
   };
 }

@@ -57,6 +57,20 @@ export type { BrushToolType, BrushControllerConfig } from './editor/terrain-brus
 export { BrushCursor } from './rendering/brush-cursor.js';
 export type { CursorMode } from './rendering/brush-cursor.js';
 
+// Editor — Region Selection (Phase 6)
+export { TerrainSelection } from './editor/region-select.js';
+export type { Vec3, ClipboardEntry, TerrainClipboard } from './editor/region-select.js';
+
+// Editor — Region Transform (Phase 6)
+export { transformRegion, defaultRegionTransform } from './editor/region-transform.js';
+export type { RegionTransform } from './editor/region-transform.js';
+
+// Editor — Fill & Replace (Phase 6)
+export { fillRegion, replaceInRegion } from './editor/fill-replace.js';
+
+// Editor — Sea Level (Phase 6)
+export { createSeaLevel, evaporateWater } from './editor/sea-level.js';
+
 // Heightmap & Colormap Import (Phase 5)
 export { loadImage, parseHeightmap, parseColormap, importTerrain } from './generation/heightmap-importer.js';
 export type { ImportRegion } from './generation/heightmap-importer.js';

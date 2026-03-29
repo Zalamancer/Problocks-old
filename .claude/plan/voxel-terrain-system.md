@@ -452,44 +452,44 @@ Replace the current heightmap-based terrain (`TerrainComponent` + `noise.ts` + `
 ### 6.1 Region Selection
 **File**: `packages/engine/src/terrain/editor/region-select.ts`
 
-- [ ] `TerrainSelection` class: `min: Vector3`, `max: Vector3`, `clipboard?`
-- [ ] Click-drag in viewport to create selection box
-- [ ] 3D handles: move draggers (per-axis arrows) + scale handles (corner cubes)
-- [ ] Gizmo-based interaction via Babylon.js `BoundingBoxGizmo` or custom gizmos
-- [ ] Keyboard: Ctrl+C (copy), Ctrl+V (paste), Ctrl+X (cut), Ctrl+D (duplicate), Delete
-- [ ] Shift+scale = proportional, Ctrl+scale = symmetric
+- [x] `TerrainSelection` class: `min: Vector3`, `max: Vector3`, `clipboard?`
+- [x] Click-drag in viewport to create selection box
+- [x] 3D handles: move draggers (per-axis arrows) + scale handles (corner cubes)
+- [x] Gizmo-based interaction via Babylon.js `BoundingBoxGizmo` or custom gizmos
+- [x] Keyboard: Ctrl+C (copy), Ctrl+V (paste), Ctrl+X (cut), Ctrl+D (duplicate), Delete
+- [x] Shift+scale = proportional, Ctrl+scale = symmetric
 
 ### 6.2 Transform Tool
 **File**: `packages/engine/src/terrain/editor/region-transform.ts`
 
-- [ ] `transformRegion(grid, selection, {position, rotation, scale}, mergeEmpty): void`
-- [ ] Copy voxels from selection → apply transform → write to new location
-- [ ] Merge Empty toggle: when false, air voxels don't overwrite destination
-- [ ] Live Edit mode: update terrain in real-time during drag
-- [ ] Wireframe preview mode: show outline only, apply on Enter/button
+- [x] `transformRegion(grid, selection, {position, rotation, scale}, mergeEmpty): void`
+- [x] Copy voxels from selection → apply transform → write to new location
+- [x] Merge Empty toggle: when false, air voxels don't overwrite destination
+- [x] Live Edit mode: update terrain in real-time during drag
+- [x] Wireframe preview mode: show outline only, apply on Enter/button
 
 ### 6.3 Fill & Replace Tool
 **File**: `packages/engine/src/terrain/editor/fill-replace.ts`
 
-- [ ] `fillRegion(grid, selection, material): void` — all voxels in region → occupancy 1.0, selected material
-- [ ] `replaceInRegion(grid, selection, source, target): void` — swap material where it matches source
+- [x] `fillRegion(grid, selection, material): void` — all voxels in region → occupancy 1.0, selected material
+- [x] `replaceInRegion(grid, selection, source, target): void` — swap material where it matches source
 
 ### 6.4 Sea Level Tool
 **File**: `packages/engine/src/terrain/editor/sea-level.ts`
 
-- [ ] `createSeaLevel(grid, region, waterLevel): void`
+- [x] `createSeaLevel(grid, region, waterLevel): void`
   - Fill empty voxels below `waterLevel` with Water material
   - Partial occupancy at surface level for smooth water line
-- [ ] `evaporateWater(grid, region): void`
+- [x] `evaporateWater(grid, region): void`
   - Set all Water material voxels in region to Air
 
 ### 6.5 Region Tools UI
 **File**: `apps/web-studio/src/components/studio/terrain-editor/EditTab.tsx` (extend)
 
-- [ ] Select tool button → enables selection mode
-- [ ] Transform tool button → shows move/rotate/scale inputs + Merge Empty + Live Edit toggles
-- [ ] Fill tool: Fill vs Replace toggle, material picker(s), Apply button
-- [ ] Sea Level tool: region controls, water level Y input, Create/Evaporate buttons
+- [x] Select tool button → enables selection mode
+- [x] Transform tool button → shows move/rotate/scale inputs + Merge Empty + Live Edit toggles
+- [x] Fill tool: Fill vs Replace toggle, material picker(s), Apply button
+- [x] Sea Level tool: region controls, water level Y input, Create/Evaporate buttons
 
 **MILESTONE**: Select a terrain region, transform it, fill it with a different material, add a sea level.
 
