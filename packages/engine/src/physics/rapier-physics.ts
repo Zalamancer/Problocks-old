@@ -153,6 +153,55 @@ export class RapierPhysics extends PhysicsEngine {
     return { x: vel.x, y: vel.y, z: vel.z };
   }
 
+  /**
+   * Add a heightfield terrain collider (static).
+   * Heights should be row-major; this converts to column-major for Rapier.
+   */
+  addHeightField(options: {
+    rows: number;
+    cols: number;
+    heights: Float32Array;
+    scaleX: number;
+    scaleY: number;
+    scaleZ: number;
+    position?: { x: number; y: number; z: number };
+    friction?: number;
+    restitution?: number;
+  }): string {
+    const id = `body_${this.nextBodyId++}`;
+    const { rows, cols, heights, scaleX, scaleY, scaleZ } = options;
+
+    // Rapier expects column-major order, our heightmap is row-major
+    // nrows = rows-1 segments, ncols = cols-1 segments
+    const nrows = rows - 1;
+    const ncols = cols - 1;
+
+    // Convert row-major to column-major
+    const colMajor = new Float32Array(rows * cols);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        colMajor[c * rows + r] = heights[r * cols + c];
+      }
+    }
+
+    const bodyDesc = RAPIER.RigidBodyDesc.fixed();
+    const pos = options.position ?? { x: 0, y: 0, z: 0 };
+    bodyDesc.setTranslation(pos.x, pos.y, pos.z);
+    const rigidBody = this.world.createRigidBody(bodyDesc);
+
+    const colliderDesc = RAPIER.ColliderDesc.heightfield(
+      nrows, ncols,
+      colMajor,
+      new RAPIER.Vector3(scaleX, scaleY, scaleZ),
+    );
+    colliderDesc.setFriction(options.friction ?? 0.7);
+    colliderDesc.setRestitution(options.restitution ?? 0.2);
+
+    const collider = this.world.createCollider(colliderDesc, rigidBody);
+    this.bodies.set(id, { rigidBody, collider });
+    return id;
+  }
+
   setGravity(x: number, y: number, z: number): void {
     this.world.gravity = new RAPIER.Vector3(x, y, z);
   }

@@ -1,11 +1,30 @@
 import * as BABYLON from '@babylonjs/core';
-import { GridMaterial } from '@babylonjs/materials';
+import { GridMaterial, WaterMaterial } from '@babylonjs/materials';
 import { Renderer, type RendererOptions } from './renderer.js';
 import { UnifiedGizmo } from './unified-gizmo.js';
+import type { TerrainLayer } from '../core/component.js';
 
 interface MeshEntry {
   mesh: BABYLON.AbstractMesh;
   entityId: string;
+}
+
+export interface TerrainRenderOptions {
+  width: number;
+  depth: number;
+  subdivisions: number;
+  heightData: Float32Array;
+  maxHeight: number;
+  layers: TerrainLayer[];
+}
+
+export interface WaterRenderOptions {
+  width: number;
+  depth: number;
+  waterLevel: number;
+  color: string;
+  waveHeight: number;
+  waveSpeed: number;
 }
 
 /**
@@ -20,6 +39,9 @@ export class BabylonRenderer extends Renderer {
   private meshes: Map<string, MeshEntry> = new Map();
   private gizmo: UnifiedGizmo | null = null;
   private attachedGizmoEntityId: string | null = null;
+  private terrainMesh: BABYLON.GroundMesh | null = null;
+  private waterMesh: BABYLON.Mesh | null = null;
+  private waterMaterial: WaterMaterial | null = null;
 
   async init(options: RendererOptions): Promise<void> {
     const canvas = options.canvas;
@@ -47,8 +69,9 @@ export class BabylonRenderer extends Renderer {
     this.camera.upperRadiusLimit = 100;
     this.camera.wheelPrecision = 20;
 
-    // Disable default wheel zoom — Viewport handles wheel events for pan/zoom
-    this.camera.inputs.removeByType('ArcRotateCameraMouseWheelInput');
+    // Disable default wheel zoom — Viewport handles wheel events for orbit/zoom
+    const wheelInput = this.camera.inputs.attached['mousewheel'];
+    if (wheelInput) this.camera.inputs.remove(wheelInput);
 
     // Lights
     const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), this.scene);
@@ -178,5 +201,171 @@ export class BabylonRenderer extends Renderer {
 
   getAttachedGizmoEntityId(): string | null {
     return this.attachedGizmoEntityId;
+  }
+
+  // ── Terrain ──────────────────────────────────────────────
+
+  createTerrain(options: TerrainRenderOptions): BABYLON.GroundMesh {
+    if (this.terrainMesh) {
+      this.terrainMesh.dispose();
+    }
+
+    const { width, depth, subdivisions, heightData, maxHeight, layers } = options;
+    const rows = subdivisions + 1;
+    const cols = subdivisions + 1;
+
+    // Create a subdivided ground
+    const ground = BABYLON.MeshBuilder.CreateGround('__terrain', {
+      width,
+      height: depth,
+      subdivisions,
+      updatable: true,
+    }, this.scene) as BABYLON.GroundMesh;
+
+    // Get vertex positions and set heights from heightmap
+    const positions = ground.getVerticesData(BABYLON.VertexBuffer.PositionKind)!;
+    const colors = new Float32Array((positions.length / 3) * 4);
+
+    for (let i = 0; i < positions.length / 3; i++) {
+      // Ground mesh vertices are laid out row by row
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const heightIdx = row * cols + col;
+      const h = heightData[heightIdx] ?? 0;
+
+      // Set Y position
+      positions[i * 3 + 1] = h;
+
+      // Compute normalized height for coloring [0, 1]
+      const normalizedH = maxHeight > 0 ? h / maxHeight : 0;
+
+      // Blend terrain layer colors based on height
+      const color = this.blendTerrainColor(normalizedH, layers);
+      colors[i * 4 + 0] = color.r;
+      colors[i * 4 + 1] = color.g;
+      colors[i * 4 + 2] = color.b;
+      colors[i * 4 + 3] = 1.0;
+    }
+
+    ground.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
+    ground.setVerticesData(BABYLON.VertexBuffer.ColorKind, colors);
+
+    // Recompute normals for proper lighting
+    const indices = ground.getIndices()!;
+    const normals = new Float32Array(positions.length);
+    BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+    ground.updateVerticesData(BABYLON.VertexBuffer.NormalKind, normals);
+
+    // Material that uses vertex colors
+    const mat = new BABYLON.StandardMaterial('__terrainMat', this.scene);
+    mat.diffuseColor = BABYLON.Color3.White();
+    mat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+    mat.backFaceCulling = true;
+    // Enable vertex color usage by setting the vertex color flag
+    ground.useVertexColors = true;
+    ground.material = mat;
+
+    ground.receiveShadows = true;
+    this.terrainMesh = ground;
+    return ground;
+  }
+
+  private blendTerrainColor(
+    normalizedHeight: number,
+    layers: TerrainLayer[],
+  ): { r: number; g: number; b: number } {
+    let totalWeight = 0;
+    let r = 0, g = 0, b = 0;
+
+    for (const layer of layers) {
+      const [lo, hi] = layer.heightRange;
+      // Smooth weight: full inside range, fades at edges
+      let weight = 0;
+      if (normalizedHeight >= lo && normalizedHeight <= hi) {
+        const mid = (lo + hi) / 2;
+        const halfSpan = (hi - lo) / 2;
+        // Bell-curve-ish weight
+        const dist = Math.abs(normalizedHeight - mid) / halfSpan;
+        weight = 1 - dist * dist;
+      }
+      if (weight > 0) {
+        const c = BABYLON.Color3.FromHexString(layer.tint);
+        r += c.r * weight;
+        g += c.g * weight;
+        b += c.b * weight;
+        totalWeight += weight;
+      }
+    }
+
+    if (totalWeight > 0) {
+      return { r: r / totalWeight, g: g / totalWeight, b: b / totalWeight };
+    }
+    return { r: 0.5, g: 0.5, b: 0.5 };
+  }
+
+  getTerrainMesh(): BABYLON.GroundMesh | null {
+    return this.terrainMesh;
+  }
+
+  // ── Water ────────────────────────────────────────────────
+
+  createWater(options: WaterRenderOptions): BABYLON.Mesh {
+    if (this.waterMesh) {
+      this.waterMesh.dispose();
+      this.waterMaterial?.dispose();
+    }
+
+    const { width, depth, waterLevel, color, waveHeight, waveSpeed } = options;
+
+    const water = BABYLON.MeshBuilder.CreateGround('__water', {
+      width,
+      height: depth,
+      subdivisions: 64,
+    }, this.scene);
+    water.position.y = waterLevel;
+
+    const waterMat = new WaterMaterial('__waterMat', this.scene);
+    const waterColor = BABYLON.Color3.FromHexString(color);
+    waterMat.diffuseColor = waterColor;
+    waterMat.windForce = waveSpeed * -5;
+    waterMat.waveHeight = waveHeight;
+    waterMat.waveSpeed = waveSpeed * 50;
+    waterMat.windDirection = new BABYLON.Vector2(1, 1);
+    waterMat.waterColor = waterColor;
+    waterMat.colorBlendFactor = 0.3;
+    waterMat.bumpHeight = 0.1;
+    waterMat.waveLength = 0.3;
+
+    // Add reflection/refraction for all meshes in scene
+    if (this.terrainMesh) {
+      waterMat.addToRenderList(this.terrainMesh);
+    }
+    // Add skybox / environment if present
+    const skybox = this.scene.getMeshByName('__skybox');
+    if (skybox) waterMat.addToRenderList(skybox);
+
+    // Also reflect entity meshes
+    for (const [, entry] of this.meshes) {
+      waterMat.addToRenderList(entry.mesh);
+    }
+
+    water.material = waterMat;
+    this.waterMesh = water;
+    this.waterMaterial = waterMat;
+    return water;
+  }
+
+  getWaterLevel(): number {
+    return this.waterMesh?.position.y ?? 0;
+  }
+
+  /**
+   * Add a mesh to water reflection/refraction lists.
+   * Call after creating new entity meshes if water exists.
+   */
+  addToWaterRenderList(mesh: BABYLON.AbstractMesh): void {
+    if (this.waterMaterial) {
+      this.waterMaterial.addToRenderList(mesh);
+    }
   }
 }

@@ -30,3 +30,8 @@ export { QuickJSRuntime } from './scripting/quickjs-runtime.js';
 
 // Components
 export { TransformComponent, MeshComponent, RigidBodyComponent } from './core/component.js';
+export { TerrainComponent, WaterComponent } from './core/component.js';
+export type { TerrainLayer } from './core/component.js';
+
+// Terrain generation
+export { generateHeightmap, fbm, setNoiseSeed } from './terrain/noise.js';

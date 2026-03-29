@@ -1,5 +1,7 @@
 import type { BabylonRenderer } from '../renderer/babylon-renderer.js';
 import type { RapierPhysics } from '../physics/rapier-physics.js';
+import { generateHeightmap } from '../terrain/noise.js';
+import type { TerrainComponent, WaterComponent } from './component.js';
 
 /**
  * The main simulation loop.
@@ -18,6 +20,14 @@ export class SimulationLoop {
 
   // Entity tracking: maps entity IDs to physics body IDs
   private entityToBody: Map<string, string> = new Map();
+
+  // Terrain & water state
+  private terrainBodyId: string | null = null;
+  private terrainHeightData: Float32Array | null = null;
+  private terrainConfig: { width: number; depth: number; subdivisions: number; maxHeight: number } | null = null;
+  private waterLevel: number | null = null;
+  private waterBuoyancy = 9.8;
+  private waterDrag = 0.8;
 
   constructor(renderer: BabylonRenderer, physics: RapierPhysics) {
     this.renderer = renderer;
@@ -78,6 +88,100 @@ export class SimulationLoop {
     this.entityToBody.set(entityId, bodyId);
   }
 
+  /**
+   * Create terrain with procedural heightmap, visual mesh, and physics collider.
+   */
+  createTerrain(terrain: TerrainComponent): void {
+    const rows = terrain.subdivisions + 1;
+    const cols = terrain.subdivisions + 1;
+
+    // Generate procedural heightmap
+    const heightData = generateHeightmap({
+      rows,
+      cols,
+      scale: terrain.noiseScale,
+      height: terrain.maxHeight,
+      octaves: terrain.octaves,
+      seed: terrain.seed,
+    });
+
+    this.terrainHeightData = heightData;
+    this.terrainConfig = {
+      width: terrain.width,
+      depth: terrain.depth,
+      subdivisions: terrain.subdivisions,
+      maxHeight: terrain.maxHeight,
+    };
+
+    // Visual terrain mesh
+    this.renderer.createTerrain({
+      width: terrain.width,
+      depth: terrain.depth,
+      subdivisions: terrain.subdivisions,
+      heightData,
+      maxHeight: terrain.maxHeight,
+      layers: terrain.layers,
+    });
+
+    // Physics heightfield collider
+    this.terrainBodyId = this.physics.addHeightField({
+      rows,
+      cols,
+      heights: heightData,
+      scaleX: terrain.width,
+      scaleY: 1,
+      scaleZ: terrain.depth,
+    });
+  }
+
+  /**
+   * Create water plane with visual material. Enables buoyancy for physics bodies.
+   */
+  createWater(water: WaterComponent): void {
+    this.waterLevel = water.waterLevel;
+    this.waterBuoyancy = water.buoyancy;
+    this.waterDrag = water.waterDrag;
+
+    this.renderer.createWater({
+      width: water.width,
+      depth: water.depth,
+      waterLevel: water.waterLevel,
+      color: water.color,
+      waveHeight: water.waveHeight,
+      waveSpeed: water.waveSpeed,
+    });
+  }
+
+  /**
+   * Get terrain height at a world position (bilinear interpolation).
+   */
+  getTerrainHeightAt(worldX: number, worldZ: number): number {
+    if (!this.terrainHeightData || !this.terrainConfig) return 0;
+    const { width, depth, subdivisions } = this.terrainConfig;
+    const rows = subdivisions + 1;
+    const cols = subdivisions + 1;
+
+    // Convert world coords to grid coords
+    const gx = ((worldX + width / 2) / width) * (cols - 1);
+    const gz = ((worldZ + depth / 2) / depth) * (rows - 1);
+
+    const x0 = Math.max(0, Math.min(cols - 2, Math.floor(gx)));
+    const z0 = Math.max(0, Math.min(rows - 2, Math.floor(gz)));
+    const fx = gx - x0;
+    const fz = gz - z0;
+
+    const h00 = this.terrainHeightData[z0 * cols + x0];
+    const h10 = this.terrainHeightData[z0 * cols + x0 + 1];
+    const h01 = this.terrainHeightData[(z0 + 1) * cols + x0];
+    const h11 = this.terrainHeightData[(z0 + 1) * cols + x0 + 1];
+
+    // Bilinear interpolation
+    return (h00 * (1 - fx) * (1 - fz)) +
+           (h10 * fx * (1 - fz)) +
+           (h01 * (1 - fx) * fz) +
+           (h11 * fx * fz);
+  }
+
   removeEntity(entityId: string): void {
     const bodyId = this.entityToBody.get(entityId);
     if (bodyId) {
@@ -125,6 +229,33 @@ export class SimulationLoop {
   }
 
   /**
+   * Apply buoyancy forces to entities submerged in water.
+   */
+  private applyBuoyancy(): void {
+    if (this.waterLevel === null) return;
+
+    for (const [entityId, bodyId] of this.entityToBody) {
+      const pos = this.physics.getBodyPosition(bodyId);
+      const depth = this.waterLevel - pos.y;
+
+      if (depth > 0) {
+        // Submerged: apply upward buoyancy force proportional to depth
+        const submersion = Math.min(depth, 2.0); // cap at 2 units
+        const buoyancyForce = this.waterBuoyancy * submersion;
+        this.physics.applyForce(bodyId, { x: 0, y: buoyancyForce, z: 0 });
+
+        // Apply drag to slow submerged objects
+        const vel = this.physics.getVelocity(bodyId);
+        this.physics.applyForce(bodyId, {
+          x: -vel.x * this.waterDrag,
+          y: -vel.y * this.waterDrag * 0.5,
+          z: -vel.z * this.waterDrag,
+        });
+      }
+    }
+  }
+
+  /**
    * Sync physics positions to visual meshes.
    */
   private syncTransforms(): void {
@@ -160,6 +291,7 @@ export class SimulationLoop {
 
     // Fixed timestep physics
     while (this.accumulator >= this.physicsTimestep) {
+      this.applyBuoyancy();
       this.physics.step(this.physicsTimestep);
       this.accumulator -= this.physicsTimestep;
     }
