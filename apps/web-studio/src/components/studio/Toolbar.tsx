@@ -26,10 +26,11 @@ import {
   RotateCw,
   Scaling,
   MousePointer,
+  Store,
 } from 'lucide-react';
 
 export function Toolbar() {
-  const { isPlaying, setPlaying, addEntity } = useStudio();
+  const { isPlaying, setPlaying, addEntity, marketplaceOpen, toggleMarketplace } = useStudio();
 
   let entityCounter = 10;
   const insertEntity = (shape: 'box' | 'sphere' | 'cylinder') => {
@@ -97,6 +98,15 @@ export function Toolbar() {
           <DropdownMenuItem>Script</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Button
+        variant={marketplaceOpen ? 'secondary' : 'ghost'}
+        size="sm"
+        className="gap-1.5"
+        onClick={() => toggleMarketplace()}
+      >
+        <Store className="h-4 w-4" /> Marketplace
+      </Button>
 
       <Separator orientation="vertical" className="mx-1 h-6" />
 

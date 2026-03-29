@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LandingPage } from './pages/LandingPage';
 import { HomePage } from './pages/HomePage';
 import { DetailPage } from './pages/DetailPage';
@@ -13,6 +14,7 @@ import { SettingsPage } from './pages/SettingsPage';
 
 export function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <div className="min-h-screen bg-background text-foreground">
         <Routes>
@@ -30,5 +32,6 @@ export function App() {
         </Routes>
       </div>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }

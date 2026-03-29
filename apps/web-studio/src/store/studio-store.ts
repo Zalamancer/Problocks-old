@@ -27,6 +27,7 @@ export interface StudioState {
   isPlaying: boolean;
   consoleLogs: string[];
   scriptRunning: boolean;
+  marketplaceOpen: boolean;
 }
 
 export interface StudioActions {
@@ -35,6 +36,7 @@ export interface StudioActions {
   addEntity: (entity: EntityData) => void;
   removeEntity: (id: string) => void;
   setPlaying: (playing: boolean) => void;
+  toggleMarketplace: () => void;
   runScript: (code: string) => void;
   stopScript: () => void;
   addLog: (msg: string) => void;

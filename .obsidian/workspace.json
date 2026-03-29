@@ -185,17 +185,18 @@
   },
   "active": "41dc0e8cbcb2c92c",
   "lastOpenFiles": [
+    "apps/marketplace/dist/assets/index-CPFN17Mf.css",
+    "apps/marketplace/dist/assets/index-DzslXeTI.js",
+    "apps/marketplace/src/components/ErrorBoundary.tsx",
+    "apps/web-studio/src/components/studio/MarketplaceView.tsx",
+    "apps/marketplace/src/components/marketplace/SimulationSkeleton.tsx",
+    "apps/marketplace/src/components/ui/skeleton.tsx",
+    "README.md",
     "apps/marketplace/dist/assets/index-DGOdZ1V8.css",
     "apps/marketplace/dist/assets/index-e7a4Ne_F.js",
     "apps/marketplace/src/pages/SettingsPage.tsx",
     "apps/marketplace/src/pages/DashboardPage.tsx",
     "apps/api/data/problocks.db-shm",
-    "apps/api/data/problocks.db-wal",
-    "packages/cli/dist/commands/clone.d.ts",
-    "packages/cli/dist/commands/clone.d.ts.map",
-    "packages/cli/dist/commands/clone.js",
-    "packages/cli/dist/commands/clone.js.map",
-    "packages/cli/src/commands/clone.ts",
     "node_modules/@flydotio/dockerfile/node_modules/diff/release-notes.md",
     "node_modules/@flydotio/dockerfile/node_modules/diff/README.md",
     "node_modules/@flydotio/dockerfile/node_modules/diff/CONTRIBUTING.md",
@@ -220,7 +221,6 @@
     "node_modules/@inquirer/expand/README.md",
     "node_modules/@inquirer/editor/README.md",
     "node_modules/@inquirer/checkbox/README.md",
-    "node_modules/rxjs/README.md",
     "node_modules/@vercel/node/node_modules/undici/docs/assets/lifecycle-diagram.png"
   ]
 }

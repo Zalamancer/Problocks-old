@@ -9,6 +9,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const [scriptRunning, setScriptRunning] = useState(false);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const simRef = useRef<SimulationLoop | null>(null);
   const sandboxRef = useRef<QuickJSRuntime | null>(null);
 
@@ -41,6 +42,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const removeEntity = useCallback((id: string) => {
     setEntities(prev => prev.filter(e => e.id !== id));
     if (simRef.current) simRef.current.removeEntity(id);
+  }, []);
+
+  const toggleMarketplace = useCallback(() => {
+    setMarketplaceOpen(prev => !prev);
   }, []);
 
   const setPlaying = useCallback((playing: boolean) => {
@@ -134,11 +139,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     isPlaying,
     consoleLogs,
     scriptRunning,
+    marketplaceOpen,
     selectEntity,
     updateEntity,
     addEntity,
     removeEntity,
     setPlaying,
+    toggleMarketplace,
     runScript,
     stopScript,
     addLog,

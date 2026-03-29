@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchSimulations, type Simulation } from '@/lib/api';
 import { SimulationCard } from './SimulationCard';
+import { SimulationGridSkeleton } from './SimulationSkeleton';
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
   physics: 'linear-gradient(135deg, #2d1b69, #11998e)',
@@ -40,11 +41,7 @@ export function SimulationGrid({ category, search }: SimulationGridProps) {
   }, [category, search]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <span className="text-sm text-muted-foreground">Loading simulations...</span>
-      </div>
-    );
+    return <SimulationGridSkeleton />;
   }
 
   if (sims.length === 0) {
