@@ -28,6 +28,8 @@ export class SimulationLoop {
   private waterLevel: number | null = null;
   private waterBuoyancy = 9.8;
   private waterDrag = 0.8;
+  private waterWidth = 0;
+  private waterDepth = 0;
 
   constructor(renderer: BabylonRenderer, physics: RapierPhysics) {
     this.renderer = renderer;
@@ -140,6 +142,8 @@ export class SimulationLoop {
     this.waterLevel = water.waterLevel;
     this.waterBuoyancy = water.buoyancy;
     this.waterDrag = water.waterDrag;
+    this.waterWidth = water.width;
+    this.waterDepth = water.depth;
 
     this.renderer.createWater({
       width: water.width,
@@ -229,13 +233,16 @@ export class SimulationLoop {
 
   /**
    * Apply buoyancy forces to entities submerged in water.
+   * Uses dynamic heightfield for wave-aware buoyancy and creates ripples.
    */
   private applyBuoyancy(): void {
     if (this.waterLevel === null) return;
 
     for (const [entityId, bodyId] of this.entityToBody) {
       const pos = this.physics.getBodyPosition(bodyId);
-      const depth = this.waterLevel - pos.y;
+      // Use dynamic water height (base level + wave displacement)
+      const waterHeight = this.renderer.getWaterHeightAt(pos.x, pos.z);
+      const depth = waterHeight - pos.y;
 
       if (depth > 0) {
         // Submerged: apply upward buoyancy force proportional to depth
@@ -250,6 +257,14 @@ export class SimulationLoop {
           y: -vel.y * this.waterDrag * 0.5,
           z: -vel.z * this.waterDrag,
         });
+
+        // Create ripples at water surface for objects near the surface
+        if (depth < 1.0) {
+          const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+          if (speed > 0.5) {
+            this.renderer.addWaterDrop(pos.x, pos.z, 0.03, speed * 0.005);
+          }
+        }
       }
     }
   }

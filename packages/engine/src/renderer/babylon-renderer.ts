@@ -2,6 +2,7 @@ import * as BABYLON from '@babylonjs/core';
 import { GridMaterial, WaterMaterial } from '@babylonjs/materials';
 import { Renderer, type RendererOptions } from './renderer.js';
 import { UnifiedGizmo } from './unified-gizmo.js';
+import { WaterSimulation } from './water-simulation.js';
 import type { TerrainLayer } from '../core/component.js';
 
 interface MeshEntry {
@@ -43,6 +44,9 @@ export class BabylonRenderer extends Renderer {
   private waterMesh: BABYLON.Mesh | null = null;
   private waterMaterial: WaterMaterial | null = null;
   private skybox: BABYLON.Mesh | null = null;
+  private waterSim: WaterSimulation | null = null;
+  private waterConfig: { width: number; depth: number } | null = null;
+  private waterUpdateCb: (() => void) | null = null;
 
   async init(options: RendererOptions): Promise<void> {
     const canvas = options.canvas;
@@ -334,19 +338,33 @@ export class BabylonRenderer extends Renderer {
   // ── Water ────────────────────────────────────────────────
 
   createWater(options: WaterRenderOptions): BABYLON.Mesh {
+    // Clean up previous water
+    if (this.waterUpdateCb) {
+      this.scene.unregisterBeforeRender(this.waterUpdateCb);
+      this.waterUpdateCb = null;
+    }
     if (this.waterMesh) {
       this.waterMesh.dispose();
     }
 
     const { width, depth, waterLevel, color, waveHeight, waveSpeed } = options;
+    const subdivisions = 128;
+    const simSize = subdivisions + 1; // 129×129 grid
 
+    // Updatable mesh for heightfield deformation
     const water = BABYLON.MeshBuilder.CreateGround('__water', {
       width,
       height: depth,
-      subdivisions: 64,
+      subdivisions,
+      updatable: true,
     }, this.scene);
     water.position.y = waterLevel;
 
+    // Heightfield simulation
+    this.waterSim = new WaterSimulation(simSize);
+    this.waterConfig = { width, depth };
+
+    // WaterMaterial for reflections/refractions + ambient bump detail
     const waterMat = new WaterMaterial('__waterMat', this.scene, new BABYLON.Vector2(512, 512));
     waterMat.bumpTexture = new BABYLON.Texture(
       'https://assets.babylonjs.com/textures/waterbump.png',
@@ -378,11 +396,49 @@ export class BabylonRenderer extends Renderer {
     water.material = waterMat;
     this.waterMesh = water;
     this.waterMaterial = waterMat;
+
+    // Step simulation + deform mesh each frame
+    this.waterUpdateCb = () => {
+      if (!this.waterSim || !this.waterMesh) return;
+      this.waterSim.step();
+      this.waterSim.step(); // 2 steps/frame for stability
+
+      const positions = this.waterMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+      if (!positions) return;
+
+      const heights = this.waterSim.heightData;
+      const total = simSize * simSize;
+      for (let i = 0; i < total; i++) {
+        positions[i * 3 + 1] = heights[i];
+      }
+      this.waterMesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, positions);
+    };
+    this.scene.registerBeforeRender(this.waterUpdateCb);
+
     return water;
   }
 
   getWaterLevel(): number {
     return this.waterMesh?.position.y ?? 0;
+  }
+
+  /** Get dynamic water height at a world position (base level + wave displacement). */
+  getWaterHeightAt(worldX: number, worldZ: number): number {
+    const base = this.waterMesh?.position.y ?? 0;
+    if (!this.waterSim || !this.waterConfig) return base;
+    const { width, depth } = this.waterConfig;
+    const nx = (worldX + width / 2) / width;
+    const nz = (depth / 2 - worldZ) / depth; // inverted to match mesh row order
+    return base + this.waterSim.getHeight(nx, nz);
+  }
+
+  /** Add a ripple at a world position. */
+  addWaterDrop(worldX: number, worldZ: number, radius: number, strength: number): void {
+    if (!this.waterSim || !this.waterConfig) return;
+    const { width, depth } = this.waterConfig;
+    const nx = (worldX + width / 2) / width;
+    const nz = (depth / 2 - worldZ) / depth;
+    this.waterSim.addDrop(nx, nz, radius, strength);
   }
 
   addToWaterRenderList(mesh: BABYLON.AbstractMesh): void {

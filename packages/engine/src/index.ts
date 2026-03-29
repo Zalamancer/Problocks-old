@@ -33,5 +33,8 @@ export { TransformComponent, MeshComponent, RigidBodyComponent } from './core/co
 export { TerrainComponent, WaterComponent } from './core/component.js';
 export type { TerrainLayer } from './core/component.js';
 
+// Water simulation
+export { WaterSimulation } from './renderer/water-simulation.js';
+
 // Terrain generation
 export { generateHeightmap, fbm, setNoiseSeed } from './terrain/noise.js';
