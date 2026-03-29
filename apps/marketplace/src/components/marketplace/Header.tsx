@@ -47,12 +47,12 @@ export function Header({ search, onSearch }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
-        <Link to="/" className="flex items-center gap-2">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 sm:gap-4 px-3 sm:px-4">
+        <Link to="/" className="flex items-center gap-2 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
             P
           </div>
-          <span className="text-lg font-bold">Problocks</span>
+          <span className="text-lg font-bold hidden sm:inline">Problocks</span>
         </Link>
 
         <div className="relative flex-1 max-w-lg">

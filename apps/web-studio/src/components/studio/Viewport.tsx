@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useContext } from 'react';
+import { useRef, useEffect, useState, useContext, useCallback } from 'react';
 import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
@@ -13,7 +13,8 @@ export function Viewport() {
   const engineRef = useRef<{ renderer: BabylonRenderer; physics: RapierPhysics; sim: SimulationLoop } | null>(null);
   const [fps, setFps] = useState(0);
   const [ready, setReady] = useState(false);
-  const { entities, selectedEntityId, isPlaying } = useStudio();
+  const [hoveredEntity, setHoveredEntity] = useState<string | null>(null);
+  const { entities, selectedEntityId, selectEntity, isPlaying } = useStudio();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -75,6 +76,29 @@ export function Viewport() {
 
       setReady(true);
 
+      // Click to select entities
+      scene.onPointerDown = (_evt, pickResult) => {
+        if (pickResult?.hit && pickResult.pickedMesh) {
+          const meshName = pickResult.pickedMesh.name;
+          // Skip internal meshes (ground, etc.)
+          if (meshName.startsWith('__')) return;
+          selectEntity(meshName);
+        } else {
+          selectEntity(null);
+        }
+      };
+
+      // Hover detection
+      scene.onPointerMove = (_evt, pickResult) => {
+        if (pickResult?.hit && pickResult.pickedMesh && !pickResult.pickedMesh.name.startsWith('__')) {
+          setHoveredEntity(pickResult.pickedMesh.name);
+          canvas!.style.cursor = 'pointer';
+        } else {
+          setHoveredEntity(null);
+          canvas!.style.cursor = 'default';
+        }
+      };
+
       // Start render loop (physics only starts when Play is clicked)
       renderer.startRenderLoop();
     }
@@ -119,6 +143,16 @@ export function Viewport() {
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">
           {isPlaying ? '▶ Playing' : '⏸ Paused'}
         </span>
+        {selectedEntityId && (
+          <span className="rounded bg-blue-600/70 px-2 py-0.5 text-[10px] text-white">
+            Selected: {selectedEntityId}
+          </span>
+        )}
+        {hoveredEntity && hoveredEntity !== selectedEntityId && (
+          <span className="rounded bg-white/20 px-2 py-0.5 text-[10px] text-gray-300">
+            Hover: {hoveredEntity}
+          </span>
+        )}
       </div>
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80">

@@ -60,8 +60,8 @@ export function LandingPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">P</div>
             <span className="text-lg font-bold">Problocks</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/explore')}>Explore</Button>
+          <div className="flex items-center gap-1 sm:gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/explore')} className="hidden sm:inline-flex">Explore</Button>
             <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Sign In</Button>
             <Button size="sm" onClick={() => navigate('/register')}>Get Started</Button>
           </div>
@@ -69,11 +69,11 @@ export function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="relative pt-32 pb-20 px-4 overflow-hidden">
+      <section className="relative pt-24 sm:pt-32 pb-12 sm:pb-20 px-4 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
         <div className="mx-auto max-w-4xl text-center relative">
           <Badge variant="secondary" className="mb-4 text-xs">Open Source Educational Platform</Badge>
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl lg:text-7xl">
+          <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl lg:text-7xl">
             Build the Future of
             <span className="block text-primary">Education Labs</span>
           </h1>
@@ -81,7 +81,7 @@ export function LandingPage() {
             Problocks is where students create, share, and monetize interactive lab simulations.
             Physics engines, circuit designers, chemistry experiments — vibecoded with AI, played by millions.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-4">
+          <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <Button size="lg" className="gap-2 text-base px-8" onClick={() => navigate('/explore')}>
               <Play className="h-5 w-5" /> Explore Simulations
             </Button>
