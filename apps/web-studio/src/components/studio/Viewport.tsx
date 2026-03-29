@@ -139,8 +139,8 @@ export function Viewport() {
           );
         } else {
           // Two-finger swipe → orbit around target
-          cam.alpha -= e.deltaX * 0.005;
-          cam.beta -= e.deltaY * 0.005;
+          cam.alpha += e.deltaX * 0.005;
+          cam.beta += e.deltaY * 0.005;
           cam.beta = Math.max(0.05, Math.min(Math.PI - 0.05, cam.beta));
         }
       }, { passive: false });
