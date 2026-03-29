@@ -189,6 +189,10 @@ export class BabylonRenderer extends Renderer {
     this.engine.runRenderLoop(() => this.scene.render());
   }
 
+  stopRenderLoop(): void {
+    this.engine.stopRenderLoop();
+  }
+
   handleResize(): void { this.engine.resize(); }
 
   getScene(): BABYLON.Scene { return this.scene; }

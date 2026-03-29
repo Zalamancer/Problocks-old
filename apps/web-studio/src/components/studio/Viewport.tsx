@@ -169,9 +169,11 @@ export function Viewport() {
   useEffect(() => {
     if (!engineRef.current) return;
     if (isPlaying) {
+      engineRef.current.renderer.stopRenderLoop(); // sim takes over rendering
       engineRef.current.sim.start();
     } else {
       engineRef.current.sim.stop();
+      engineRef.current.renderer.startRenderLoop(); // engine loop resumes
     }
   }, [isPlaying]);
 

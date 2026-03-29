@@ -16,14 +16,17 @@ export class RapierPhysics extends PhysicsEngine {
   private world!: RAPIER.World;
   private bodies: Map<string, BodyEntry> = new Map();
   private nextBodyId = 1;
+  private _disposed = false;
 
   async init(config: PhysicsConfig): Promise<void> {
     await RAPIER.init();
     const gravity = new RAPIER.Vector3(config.gravity.x, config.gravity.y, config.gravity.z);
     this.world = new RAPIER.World(gravity);
+    this._disposed = false;
   }
 
   step(deltaTime: number): void {
+    if (this._disposed) return;
     this.world.timestep = deltaTime;
     this.world.step();
   }
@@ -99,6 +102,7 @@ export class RapierPhysics extends PhysicsEngine {
   }
 
   getBodyPosition(id: string): { x: number; y: number; z: number } {
+    if (this._disposed) return { x: 0, y: 0, z: 0 };
     const entry = this.bodies.get(id);
     if (!entry) return { x: 0, y: 0, z: 0 };
     const pos = entry.rigidBody.translation();
@@ -106,6 +110,7 @@ export class RapierPhysics extends PhysicsEngine {
   }
 
   getBodyRotation(id: string): { x: number; y: number; z: number } {
+    if (this._disposed) return { x: 0, y: 0, z: 0 };
     const entry = this.bodies.get(id);
     if (!entry) return { x: 0, y: 0, z: 0 };
     const rot = entry.rigidBody.rotation();
@@ -147,6 +152,7 @@ export class RapierPhysics extends PhysicsEngine {
   }
 
   getVelocity(id: string): { x: number; y: number; z: number } {
+    if (this._disposed) return { x: 0, y: 0, z: 0 };
     const entry = this.bodies.get(id);
     if (!entry) return { x: 0, y: 0, z: 0 };
     const vel = entry.rigidBody.linvel();
@@ -188,7 +194,11 @@ export class RapierPhysics extends PhysicsEngine {
   }
 
   dispose(): void {
+    this._disposed = true;
+    for (const [, entry] of this.bodies) {
+      try { this.world.removeRigidBody(entry.rigidBody); } catch { /* already freed */ }
+    }
     this.bodies.clear();
-    this.world.free();
+    try { this.world.free(); } catch { /* already freed */ }
   }
 }
