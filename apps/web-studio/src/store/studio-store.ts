@@ -6,7 +6,7 @@ import { createContext, useContext } from 'react';
 export interface EntityData {
   id: string;
   name: string;
-  type: 'entity' | 'light' | 'camera' | 'script';
+  type: 'entity' | 'light' | 'camera' | 'script' | 'terrain';
   shape?: 'box' | 'sphere' | 'cylinder' | 'plane';
   color?: string;
   position: { x: number; y: number; z: number };
@@ -19,6 +19,15 @@ export interface EntityData {
     isStatic: boolean;
   };
   dimensions?: { width: number; height: number; depth: number };
+  terrain?: {
+    width: number;
+    depth: number;
+    subdivisions: number;
+    maxHeight: number;
+    seed: number;
+    noiseScale: number;
+    octaves: number;
+  };
 }
 
 export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings';
@@ -64,6 +73,23 @@ export function useStudio(): StudioContextType {
 
 /** Default scene entities */
 export const DEFAULT_ENTITIES: EntityData[] = [
+  {
+    id: '__terrain',
+    name: 'Terrain',
+    type: 'terrain',
+    position: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    scale: { x: 1, y: 1, z: 1 },
+    terrain: {
+      width: 100,
+      depth: 100,
+      subdivisions: 128,
+      maxHeight: 10,
+      seed: 42,
+      noiseScale: 0.03,
+      octaves: 6,
+    },
+  },
   {
     id: 'ground',
     name: 'Ground',

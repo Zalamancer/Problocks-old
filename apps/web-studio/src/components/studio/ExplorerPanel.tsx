@@ -13,10 +13,12 @@ import {
   FileCode,
   Folder,
   Square,
+  Mountain,
 } from 'lucide-react';
 import { useState } from 'react';
 
 function getEntityIcon(entity: EntityData) {
+  if (entity.type === 'terrain') return <Mountain className="h-4 w-4 text-emerald-400" />;
   if (entity.type === 'light') return <Lightbulb className="h-4 w-4 text-yellow-300" />;
   if (entity.type === 'camera') return <Camera className="h-4 w-4 text-purple-400" />;
   if (entity.type === 'script') return <FileCode className="h-4 w-4 text-green-400" />;
@@ -76,6 +78,7 @@ function FolderItem({ label, icon, children, defaultOpen = true }: {
 
 export function ExplorerPanel() {
   const { entities } = useStudio();
+  const terrainEntity = entities.find(e => e.type === 'terrain');
   const sceneEntities = entities.filter(e => e.type === 'entity');
 
   return (
@@ -87,6 +90,9 @@ export function ExplorerPanel() {
           <Globe className="h-4 w-4 text-blue-400" />
           <span className="font-medium">World</span>
         </div>
+
+        {/* Terrain */}
+        {terrainEntity && <EntityItem entity={terrainEntity} />}
 
         <FolderItem
           label="Scene"

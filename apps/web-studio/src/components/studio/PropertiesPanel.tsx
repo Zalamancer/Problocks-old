@@ -122,6 +122,76 @@ export function PropertiesPanel() {
                 />
               </PanelSection>
             )}
+
+            {/* Terrain */}
+            {entity.terrain && (
+              <>
+                <PanelSection title="Terrain" collapsible>
+                  <PanelSlider
+                    label="Max Height"
+                    value={entity.terrain.maxHeight}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, maxHeight: v } })}
+                    min={1}
+                    max={50}
+                    step={0.5}
+                    precision={1}
+                  />
+                  <PanelSlider
+                    label="Noise Scale"
+                    value={entity.terrain.noiseScale}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, noiseScale: v } })}
+                    min={0.005}
+                    max={0.15}
+                    step={0.001}
+                    precision={3}
+                  />
+                  <PanelSlider
+                    label="Octaves"
+                    value={entity.terrain.octaves}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, octaves: Math.round(v) } })}
+                    min={1}
+                    max={10}
+                    step={1}
+                    precision={0}
+                  />
+                  <PanelSlider
+                    label="Width"
+                    value={entity.terrain.width}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, width: v } })}
+                    min={20}
+                    max={500}
+                    step={10}
+                    precision={0}
+                  />
+                  <PanelSlider
+                    label="Depth"
+                    value={entity.terrain.depth}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, depth: v } })}
+                    min={20}
+                    max={500}
+                    step={10}
+                    precision={0}
+                  />
+                </PanelSection>
+
+                <PanelSection title="Randomize" collapsible>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-400 text-sm w-16 shrink-0">Seed</span>
+                    <div className="flex-1 bg-[#2a2a2a] text-white text-sm px-3 py-2 rounded-lg">
+                      {entity.terrain.seed}
+                    </div>
+                  </div>
+                  <button
+                    className="mt-2 w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
+                    onClick={() => updateEntity(entity.id, {
+                      terrain: { ...entity.terrain!, seed: Math.floor(Math.random() * 100000) },
+                    })}
+                  >
+                    Randomize Terrain
+                  </button>
+                </PanelSection>
+              </>
+            )}
           </div>
         )}
       </div>

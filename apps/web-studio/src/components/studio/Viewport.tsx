@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useContext, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
@@ -45,23 +45,28 @@ export function Viewport() {
       // Register sim with the store so RunScript can access it
       (window as any).__problocks_sim = sim;
 
-      // Create terrain + water
-      const terrain = new TerrainComponent();
-      terrain.width = 100;
-      terrain.depth = 100;
-      terrain.subdivisions = 128;
-      terrain.maxHeight = 10;
-      terrain.seed = 42;
-      terrain.noiseScale = 0.03;
-      sim.createTerrain(terrain);
+      // Create terrain + water from store
+      const terrainEntity = entities.find(e => e.type === 'terrain');
+      const t = terrainEntity?.terrain;
+      if (t) {
+        const terrain = new TerrainComponent();
+        terrain.width = t.width;
+        terrain.depth = t.depth;
+        terrain.subdivisions = t.subdivisions;
+        terrain.maxHeight = t.maxHeight;
+        terrain.seed = t.seed;
+        terrain.noiseScale = t.noiseScale;
+        terrain.octaves = t.octaves;
+        sim.createTerrain(terrain);
 
-      const water = new WaterComponent();
-      water.width = 100;
-      water.depth = 100;
-      water.waterLevel = 2.5;
-      water.buoyancy = 9.8;
-      water.waterDrag = 0.8;
-      sim.createWater(water);
+        const water = new WaterComponent();
+        water.width = t.width;
+        water.depth = t.depth;
+        water.waterLevel = 2.5;
+        water.buoyancy = 9.8;
+        water.waterDrag = 0.8;
+        sim.createWater(water);
+      }
 
       // Create all entities from store
       for (const entity of entities) {
@@ -176,6 +181,38 @@ export function Viewport() {
       engineRef.current.renderer.startRenderLoop(); // engine loop resumes
     }
   }, [isPlaying]);
+
+  // Recreate terrain when terrain settings change in the store
+  const lastTerrainKeyRef = useRef('');
+  useEffect(() => {
+    if (!engineRef.current || !ready) return;
+    const terrainEntity = entities.find(e => e.type === 'terrain');
+    if (!terrainEntity?.terrain) return;
+
+    const key = JSON.stringify(terrainEntity.terrain);
+    if (key === lastTerrainKeyRef.current) return;
+    lastTerrainKeyRef.current = key;
+
+    const t = terrainEntity.terrain;
+    const terrain = new TerrainComponent();
+    terrain.width = t.width;
+    terrain.depth = t.depth;
+    terrain.subdivisions = t.subdivisions;
+    terrain.maxHeight = t.maxHeight;
+    terrain.seed = t.seed;
+    terrain.noiseScale = t.noiseScale;
+    terrain.octaves = t.octaves;
+    engineRef.current.sim.createTerrain(terrain);
+
+    // Recreate water to match terrain dimensions
+    const water = new WaterComponent();
+    water.width = t.width;
+    water.depth = t.depth;
+    water.waterLevel = 2.5;
+    water.buoyancy = 9.8;
+    water.waterDrag = 0.8;
+    engineRef.current.sim.createWater(water);
+  }, [entities, ready]);
 
   // Sync selected entity transform from store → engine when properties change
   useEffect(() => {
