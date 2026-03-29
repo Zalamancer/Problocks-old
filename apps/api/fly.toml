@@ -9,14 +9,19 @@ primary_region = 'dfw'
 [build]
 
 [processes]
-  app = 'node ./dbsetup.js node --import tsx/esm src/index.ts'
+  app = 'node --import tsx/esm src/index.ts'
 
 [[mounts]]
   source = 'data'
-  destination = '/data'
+  destination = '/app/data'
   auto_extend_size_threshold = 80
   auto_extend_size_increment = '1GB'
   auto_extend_size_limit = '10GB'
+
+[env]
+  PORT = '5000'
+  HOST = '0.0.0.0'
+  NODE_ENV = 'production'
 
 [http_service]
   internal_port = 5000
