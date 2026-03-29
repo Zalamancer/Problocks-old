@@ -307,6 +307,17 @@ export class BabylonRenderer extends Renderer {
     return this.terrainMesh;
   }
 
+  getTerrainMeshData(): { vertices: Float32Array; indices: Uint32Array } | null {
+    if (!this.terrainMesh) return null;
+    const positions = this.terrainMesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+    const indices = this.terrainMesh.getIndices();
+    if (!positions || !indices) return null;
+    return {
+      vertices: new Float32Array(positions),
+      indices: new Uint32Array(indices),
+    };
+  }
+
   // ── Water ────────────────────────────────────────────────
 
   createWater(options: WaterRenderOptions): BABYLON.Mesh {

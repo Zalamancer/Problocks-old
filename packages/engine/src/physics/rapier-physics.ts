@@ -154,45 +154,26 @@ export class RapierPhysics extends PhysicsEngine {
   }
 
   /**
-   * Add a heightfield terrain collider (static).
-   * Heights should be row-major; this converts to column-major for Rapier.
+   * Add a triangle mesh terrain collider (static).
+   * Uses exact vertex/index data from the visual mesh for perfect alignment.
    */
-  addHeightField(options: {
-    rows: number;
-    cols: number;
-    heights: Float32Array;
-    scaleX: number;
-    scaleY: number;
-    scaleZ: number;
+  addTrimesh(options: {
+    vertices: Float32Array;
+    indices: Uint32Array;
     position?: { x: number; y: number; z: number };
     friction?: number;
     restitution?: number;
   }): string {
     const id = `body_${this.nextBodyId++}`;
-    const { rows, cols, heights, scaleX, scaleY, scaleZ } = options;
-
-    // Rapier expects column-major order, our heightmap is row-major
-    // nrows = rows-1 segments, ncols = cols-1 segments
-    const nrows = rows - 1;
-    const ncols = cols - 1;
-
-    // Convert row-major to column-major
-    const colMajor = new Float32Array(rows * cols);
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        colMajor[c * rows + r] = heights[r * cols + c];
-      }
-    }
 
     const bodyDesc = RAPIER.RigidBodyDesc.fixed();
     const pos = options.position ?? { x: 0, y: 0, z: 0 };
     bodyDesc.setTranslation(pos.x, pos.y, pos.z);
     const rigidBody = this.world.createRigidBody(bodyDesc);
 
-    const colliderDesc = RAPIER.ColliderDesc.heightfield(
-      nrows, ncols,
-      colMajor,
-      new RAPIER.Vector3(scaleX, scaleY, scaleZ),
+    const colliderDesc = RAPIER.ColliderDesc.trimesh(
+      options.vertices,
+      options.indices,
     );
     colliderDesc.setFriction(options.friction ?? 0.7);
     colliderDesc.setRestitution(options.restitution ?? 0.2);

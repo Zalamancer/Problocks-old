@@ -123,15 +123,14 @@ export class SimulationLoop {
       layers: terrain.layers,
     });
 
-    // Physics heightfield collider
-    this.terrainBodyId = this.physics.addHeightField({
-      rows,
-      cols,
-      heights: heightData,
-      scaleX: terrain.width,
-      scaleY: 1,
-      scaleZ: terrain.depth,
-    });
+    // Physics trimesh collider from actual mesh data
+    const meshData = this.renderer.getTerrainMeshData();
+    if (meshData) {
+      this.terrainBodyId = this.physics.addTrimesh({
+        vertices: meshData.vertices,
+        indices: meshData.indices,
+      });
+    }
   }
 
   /**
