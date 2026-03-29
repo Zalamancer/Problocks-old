@@ -185,17 +185,18 @@
   },
   "active": "41dc0e8cbcb2c92c",
   "lastOpenFiles": [
-    "apps/api/data/problocks.db-wal",
-    "apps/marketplace/dist/index.html",
-    "apps/marketplace/dist/assets/volumetricLightingRenderVolume.vertex-CT_TBzsR.js",
-    "apps/marketplace/dist/assets/volumetricLightingRenderVolume.vertex-BDzgbAk9.js",
-    "apps/marketplace/dist/assets/volumetricLightingRenderVolume.fragment-y7pHJzKu.js",
-    "apps/marketplace/dist/assets/volumetricLightingRenderVolume.fragment-B3mCas0B.js",
-    "apps/marketplace/dist/assets/volumetricLightingBlendVolume.fragment-o7nBFc_4.js",
-    "apps/marketplace/dist/assets/volumetricLightingBlendVolume.fragment-C-wrRSE6.js",
-    "apps/marketplace/dist/assets/tgaTextureLoader-D63MiChR.js",
-    "apps/marketplace/dist/assets/simulation-loop-B9obMI7w.js",
-    "apps/marketplace/dist/assets/selectionOutline.fragment-BuLGRxwt.js",
+    "apps/marketplace/dist/assets/babylon-renderer-Cx5rMnzH.js",
+    "apps/marketplace/dist/assets/volumetricLightingBlendVolume.fragment-CJ6DU3I9.js",
+    "apps/marketplace/dist/assets/ddsTextureLoader-CvstmH5o.js",
+    "apps/marketplace/dist/assets/basisTextureLoader-CSf52ITl.js",
+    "apps/marketplace/dist/assets/tgaTextureLoader-ER7shCL1.js",
+    "apps/marketplace/dist/assets/oitFinalSimpleBlend.fragment-C_jNrQXA.js",
+    "apps/marketplace/dist/assets/volumetricLightingBlendVolume.fragment-DyrBLBJv.js",
+    "apps/marketplace/dist/assets/ktxTextureLoader-BYLmHXqW.js",
+    "apps/marketplace/dist/assets/envTextureLoader-Cz6Aq7zt.js",
+    "apps/marketplace/dist/assets/hdrTextureLoader-v8Epjldr.js",
+    "apps/marketplace/dist/assets/iesTextureLoader-DaFT9R_C.js",
+    "docs/plans/002-next-features-roadmap.md",
     "node_modules/react-router/node_modules/cookie/README.md",
     "node_modules/react-router/README.md",
     "node_modules/react-router/LICENSE.md",
@@ -219,7 +220,6 @@
     "node_modules/bindings/LICENSE.md",
     "node_modules/file-uri-to-path/README.md",
     "node_modules/jsonwebtoken/node_modules/semver/README.md",
-    "node_modules/jsonwebtoken/README.md",
-    "node_modules/node-abi/node_modules/semver/README.md"
+    "node_modules/jsonwebtoken/README.md"
   ]
 }
