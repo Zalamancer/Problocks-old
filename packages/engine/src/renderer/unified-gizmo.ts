@@ -635,7 +635,7 @@ export class UnifiedGizmo {
     }
   }
 
-  // ── Before render: follow target + constant screen size ───────────────
+  // ── Before render: follow target + constant screen size + octant flip ──
 
   private setupBeforeRender(): void {
     this.observer = this.scene.onBeforeRenderObservable.add(() => {
@@ -648,7 +648,13 @@ export class UnifiedGizmo {
       if (camera) {
         const dist = BABYLON.Vector3.Distance(camera.position, worldPos);
         const s = dist * 0.18 * this.size;
-        this.root.scaling.setAll(s);
+
+        // Flip gizmo to the octant nearest the camera so arcs/cubes always face the viewer
+        const toCamera = camera.position.subtract(worldPos);
+        const sx = (toCamera.x >= 0 ? 1 : -1) * s;
+        const sy = (toCamera.y >= 0 ? 1 : -1) * s;
+        const sz = (toCamera.z >= 0 ? 1 : -1) * s;
+        this.root.scaling.set(sx, sy, sz);
       }
     });
   }
