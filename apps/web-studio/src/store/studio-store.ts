@@ -45,8 +45,8 @@ export interface EntityData {
   terrain?: TerrainConfig;
 }
 
-export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain';
-export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain';
+export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt';
+export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt';
 
 export interface StudioState {
   entities: EntityData[];

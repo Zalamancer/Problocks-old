@@ -109,26 +109,3 @@ export class VoxelTerrainComponent extends Component {
   /** Whether to carve procedural caves */
   caves = true;
 }
-
-/**
- * Water component — visual water plane with buoyancy physics.
- */
-export class WaterComponent extends Component {
-  readonly type = 'water';
-  /** World-space width */
-  width = 100;
-  /** World-space depth */
-  depth = 100;
-  /** Water surface Y level */
-  waterLevel = 2.5;
-  /** Wave amplitude */
-  waveHeight = 0.2;
-  /** Wave animation speed */
-  waveSpeed = 1.0;
-  /** Water color */
-  color = '#1a6b8a';
-  /** Buoyancy force multiplier */
-  buoyancy = 9.8;
-  /** Drag factor for submerged objects */
-  waterDrag = 0.8;
-}

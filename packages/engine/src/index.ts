@@ -26,5 +26,5 @@ export { QuickJSRuntime } from './scripting/quickjs-runtime.js';
 
 // Components
 export { TransformComponent, MeshComponent, RigidBodyComponent } from './core/component.js';
-export { TerrainComponent, WaterComponent, VoxelTerrainComponent } from './core/component.js';
+export { TerrainComponent, VoxelTerrainComponent } from './core/component.js';
 export type { TerrainLayer } from './core/component.js';

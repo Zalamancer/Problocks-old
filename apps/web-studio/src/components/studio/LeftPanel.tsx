@@ -19,10 +19,12 @@ import {
   Layers,
   Wrench,
   Cog,
+  Mountain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStudio, type LeftPanelGroup, type LeftPanelTab } from '@/store/studio-store';
 import { ExplorerPanel } from './ExplorerPanel';
+import { sculptState, VOXEL_PRESETS, type SculptTool } from './sculpt-state';
 import type { LucideIcon } from 'lucide-react';
 
 // ── Tab group definitions ─────────────────────────────────────────────
@@ -65,6 +67,12 @@ const TAB_GROUPS: TabGroupDef[] = [
     label: 'Insert',
     icon: PlusCircle,
     subTabs: [{ id: 'insert', label: 'Insert Objects', icon: Box }],
+  },
+  {
+    id: 'sculpt',
+    label: 'Sculpt',
+    icon: Mountain,
+    subTabs: [{ id: 'sculpt', label: 'Sculpt Tools', icon: Mountain }],
   },
   {
     id: 'terrain',
@@ -299,6 +307,102 @@ function TerrainPanel() {
   );
 }
 
+function useSculptState() {
+  const [, forceRender] = useState(0);
+  useEffect(() => sculptState.subscribe(() => forceRender(n => n + 1)), []);
+  return { tool: sculptState.tool, size: sculptState.size, strength: sculptState.strength, wireframe: sculptState.wireframe, voxelRes: sculptState.voxelRes };
+}
+
+function SculptPanel() {
+  const { tool, size, strength, wireframe, voxelRes } = useSculptState();
+
+  const tools: { id: SculptTool; label: string; icon: string }[] = [
+    { id: 'raise', label: 'Raise', icon: '▲' },
+    { id: 'lower', label: 'Lower', icon: '▼' },
+    { id: 'smooth', label: 'Smooth', icon: '~' },
+    { id: 'flatten', label: 'Flatten', icon: '=' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+      {/* Tool selection */}
+      <div>
+        <h4 className="text-xs font-medium text-zinc-400 mb-2">Tool</h4>
+        <div className="grid grid-cols-2 gap-1.5">
+          {tools.map((t) => (
+            <button key={t.id} onClick={() => sculptState.setTool(t.id)}
+              className={cn(
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg text-[13px] transition-colors',
+                tool === t.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300',
+              )}>
+              <span className="text-base">{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Brush Size */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <h4 className="text-xs font-medium text-zinc-400">Brush Size</h4>
+          <span className="text-xs text-zinc-500 tabular-nums">{size}</span>
+        </div>
+        <input type="range" min={0.5} max={8} step={0.5} value={size}
+          onChange={(e) => sculptState.setSize(parseFloat(e.target.value))}
+          className="w-full accent-blue-500" />
+      </div>
+
+      {/* Brush Strength */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <h4 className="text-xs font-medium text-zinc-400">Brush Strength</h4>
+          <span className="text-xs text-zinc-500 tabular-nums">{strength.toFixed(1)}</span>
+        </div>
+        <input type="range" min={0.1} max={1} step={0.1} value={strength}
+          onChange={(e) => sculptState.setStrength(parseFloat(e.target.value))}
+          className="w-full accent-blue-500" />
+      </div>
+
+      {/* Wireframe toggle */}
+      <div className="border-t border-white/5 pt-4">
+        <h4 className="text-xs font-medium text-zinc-400 mb-2">Display</h4>
+        <button onClick={() => sculptState.setWireframe(!wireframe)}
+          className={cn(
+            'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[13px] transition-colors',
+            wireframe ? 'bg-green-600/20 text-green-400' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300',
+          )}>
+          Wireframe
+          <span className="text-xs">{wireframe ? 'ON' : 'OFF'}</span>
+        </button>
+      </div>
+
+      {/* Voxel Resolution */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <h4 className="text-xs font-medium text-zinc-400">Resolution</h4>
+          <span className="text-xs text-zinc-500 tabular-nums">{voxelRes}&times;{voxelRes}</span>
+        </div>
+        <div className="grid grid-cols-4 gap-1">
+          {VOXEL_PRESETS.map((r) => (
+            <button key={r} onClick={() => sculptState.setVoxelRes(r)}
+              className={cn(
+                'px-2 py-1.5 rounded-lg text-[12px] transition-colors',
+                voxelRes === r
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300',
+              )}>
+              {r}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PanelContent({ group }: { group: LeftPanelGroup }) {
   switch (group) {
     case 'scene':
@@ -317,6 +421,8 @@ function PanelContent({ group }: { group: LeftPanelGroup }) {
       return <AssetsPanel />;
     case 'insert':
       return <InsertPanel />;
+    case 'sculpt':
+      return <SculptPanel />;
     case 'terrain':
       return <TerrainPanel />;
     case 'settings':
