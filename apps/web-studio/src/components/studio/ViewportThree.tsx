@@ -63,35 +63,35 @@ const skirtFS = /* glsl */ `
   }
 `;
 
-// ── Grass shaders (EXACT from codesandbox webgl-grass) ──────────────
+// ── Grass shaders (surface-scattered, original look) ────────────────
 
 const grassVertexShader = /* glsl */ `
   uniform float uTime;
+  uniform sampler2D uCloud;
 
-  // uv.x = blade height (0=base, 1=tip), stored in attribute
-  // uv.y = random seed
+  // uv.x = blade height fraction (0=base, 1=tip)
+  // uv.y = random seed for this blade
 
   varying vec3 vPosition;
-  varying vec2 vUv;
   varying vec3 vNormal;
-
-  float wave(float waveSize, float tipDistance, float centerDistance) {
-    bool isTip = uv.x > 0.8;
-    float waveDistance = isTip ? tipDistance : centerDistance;
-    return sin((uTime / 500.0) + waveSize) * waveDistance;
-  }
+  varying float vLocalHeight;
+  varying float vSeed;
 
   void main() {
-    vPosition = position;
-    vUv = uv;
     vNormal = normalize(normalMatrix * normal);
+    vLocalHeight = uv.x;
+    vSeed = uv.y;
+    vPosition = position;
 
-    // Wind: sway upper vertices along surface tangent
+    // Wind: sway upper vertices along a tangent
     vec3 pos = position;
-    if (uv.x > 0.01) {
+    if (uv.x > 0.1) {
+      float wave = sin((uTime / 500.0) + uv.y * 10.0) * uv.x;
       vec3 tangent = normalize(cross(normal, vec3(0.0, 0.0, 1.0)));
       if (length(tangent) < 0.01) tangent = normalize(cross(normal, vec3(1.0, 0.0, 0.0)));
-      pos += tangent * wave(uv.y * 10.0, 0.3, 0.1);
+      // Tip gets more sway than mid
+      float tipAmount = uv.x > 0.8 ? 0.3 : 0.1;
+      pos += tangent * wave * tipAmount;
     }
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -102,20 +102,25 @@ const grassFragmentShader = /* glsl */ `
   uniform sampler2D uCloud;
 
   varying vec3 vPosition;
-  varying vec2 vUv;
   varying vec3 vNormal;
-
-  vec3 green = vec3(0.2, 0.6, 0.3);
+  varying float vLocalHeight;
+  varying float vSeed;
 
   void main() {
-    // Height-based gradient: dark at base, bright at tip (original look)
-    vec3 color = mix(green * 0.7, green, vUv.x);
-    // Cloud texture variation using world position (matches original)
-    vec2 cloudUV = vPosition.xz * 0.033 + 0.5;
+    vec3 green = vec3(0.2, 0.6, 0.3);
+
+    // Color gradient from dark base to bright tip (original look)
+    float t = clamp(vLocalHeight / 1.0, 0.0, 1.0);
+    vec3 color = mix(green * 0.7, green, t);
+
+    // Cloud texture variation using world position
+    vec2 cloudUV = vPosition.xz * 0.05 + vec2(vSeed * 3.0);
     color = mix(color, texture2D(uCloud, cloudUV).rgb, 0.4);
 
-    float lighting = normalize(dot(vNormal, vec3(10)));
-    gl_FragColor = vec4(color + lighting * 0.03, 1.0);
+    // Directional lighting
+    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+    float diff = max(dot(vNormal, lightDir), 0.0) * 0.6 + 0.4;
+    gl_FragColor = vec4(color * diff, 1.0);
   }
 `;
 
@@ -125,27 +130,7 @@ const TERRAIN_SIZE = 40;
 const BOTTOM_Y = -3;
 const RES_PRESETS = [32, 64, 128, 256];
 const GRASS_SIZE = 36;   // covers [-18, 18] — inside terrain bounds
-
-/** Compute total surface area of a non-indexed triangle mesh (m²) */
-function meshSurfaceArea(geo: THREE.BufferGeometry): number {
-  const pos = geo.attributes.position.array as Float32Array;
-  const triCount = pos.length / 9;
-  let area = 0;
-  for (let i = 0; i < triCount; i++) {
-    const o = i * 9;
-    const ax = pos[o+3]-pos[o], ay = pos[o+4]-pos[o+1], az = pos[o+5]-pos[o+2];
-    const bx = pos[o+6]-pos[o], by = pos[o+7]-pos[o+1], bz = pos[o+8]-pos[o+2];
-    const cx = ay*bz - az*by, cy = az*bx - ax*bz, cz = ax*by - ay*bx;
-    area += Math.sqrt(cx*cx + cy*cy + cz*cz) * 0.5;
-  }
-  return area;
-}
-
-/** Blade count from density (blades/m²) and mesh surface area */
-function grassBladeCount(geo: THREE.BufferGeometry): number {
-  const area = meshSurfaceArea(geo);
-  return Math.min(500000, Math.max(100, Math.round(area * sculptState.grassDensity)));
-}
+const GRASS_COUNT = 50000;
 
 // ── Grass blade generation (surface-scattered) ─────────────────────
 
@@ -426,46 +411,21 @@ function syncHeightTexFromField(data: Float32Array, tex: THREE.DataTexture, fiel
 
 import type { SculptTool } from './sculpt-state';
 
-/** Axis-aware distance: only count enabled axes */
-function axisDist(dx: number, dy: number, dz: number, ax: boolean, ay: boolean, az: boolean): number {
-  return Math.sqrt((ax ? dx * dx : 0) + (ay ? dy * dy : 0) + (az ? dz * dz : 0));
-}
-
 /** Sculpt into a voxel field and regenerate the mesh */
 function voxelSculpt(
   field: ScalarField, mesh: THREE.Mesh,
   pt: THREE.Vector3, radius: number, strength: number, tool: SculptTool,
 ) {
   const amount = strength * 0.15;
-  const { x: ax, y: ay, z: az } = sculptState.axes;
-
-  // Axis-aware add/remove: extends infinitely along disabled axes
-  const addAxis = (wx: number, wy: number, wz: number, r: number, amt: number) => {
-    const gr = r / field.cellSize;
-    const [cx, cy, cz] = field.gridIdx(wx, wy, wz);
-    const ri = Math.ceil(gr);
-    for (let dz = -ri; dz <= ri; dz++) {
-      for (let dy = -ri; dy <= ri; dy++) {
-        for (let dx = -ri; dx <= ri; dx++) {
-          const ix = cx + dx, iy = cy + dy, iz = cz + dz;
-          if (ix < 0 || ix > field.nx || iy < 0 || iy > field.ny || iz < 0 || iz > field.nz) continue;
-          const d = axisDist(dx, dy, dz, ax, ay, az);
-          if (d > gr) continue;
-          const falloff = (1 - d / gr);
-          field.data[field.idx(ix, iy, iz)] += falloff * falloff * amt;
-        }
-      }
-    }
-  };
-
   switch (tool) {
     case 'raise':
-      addAxis(pt.x, pt.y, pt.z, radius, amount);
+      field.addSphere(pt.x, pt.y, pt.z, radius, amount);
       break;
     case 'lower':
-      addAxis(pt.x, pt.y, pt.z, radius, -amount);
+      field.removeSphere(pt.x, pt.y, pt.z, radius, amount);
       break;
     case 'smooth': {
+      // Smooth: blend each voxel toward its neighbors' average
       const r = radius / field.cellSize;
       const [cx, cy, cz] = field.gridIdx(pt.x, pt.y, pt.z);
       const ri = Math.ceil(r);
@@ -474,7 +434,7 @@ function voxelSculpt(
           for (let dx = -ri; dx <= ri; dx++) {
             const ix = cx + dx, iy = cy + dy, iz = cz + dz;
             if (ix < 1 || ix >= field.nx || iy < 1 || iy >= field.ny || iz < 1 || iz >= field.nz) continue;
-            const d = axisDist(dx, dy, dz, ax, ay, az);
+            const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (d > r) continue;
             const f = (1 - d / r) * amount;
             const avg = (
@@ -537,20 +497,10 @@ export function ViewportThree() {
   // Sync sculptState → Three.js
   useEffect(() => {
     let prevRes = sculptState.voxelRes;
-    let prevDensity = sculptState.grassDensity;
     const unsub = sculptState.subscribe(() => {
       if (!threeRef.current) return;
       const tr = threeRef.current;
       tr.terrain.material = sculptState.wireframe ? tr.wMat : tr.tMat;
-
-      // Rebuild grass if density changed
-      if (sculptState.grassDensity !== prevDensity) {
-        prevDensity = sculptState.grassDensity;
-        const geo = tr.terrain.geometry;
-        const newGrassGeo = scatterGrassOnMesh(geo, grassBladeCount(geo));
-        tr.grassMesh.geometry.dispose();
-        tr.grassMesh.geometry = newGrassGeo;
-      }
 
       // Rebuild voxel field if resolution changed
       if (sculptState.voxelRes !== prevRes) {
@@ -578,7 +528,7 @@ export function ViewportThree() {
         const newGeo = generateMesh(newField);
         tr.terrain.geometry.dispose();
         tr.terrain.geometry = newGeo;
-        const newGrassGeo = scatterGrassOnMesh(newGeo, grassBladeCount(newGeo));
+        const newGrassGeo = scatterGrassOnMesh(newGeo, GRASS_COUNT);
         tr.grassMesh.geometry.dispose();
         tr.grassMesh.geometry = newGrassGeo;
       }
@@ -666,7 +616,7 @@ export function ViewportThree() {
 
     // ── Grass (scattered on mesh faces) ──
     const grassMat = createGrassMaterial();
-    const grassGeo = scatterGrassOnMesh(tGeo, grassBladeCount(tGeo));
+    const grassGeo = scatterGrassOnMesh(tGeo, GRASS_COUNT);
     const grassMesh = new THREE.Mesh(grassGeo, grassMat);
     terrainGroup.add(grassMesh);
 
@@ -701,7 +651,7 @@ export function ViewportThree() {
 
     function rebuildGrass() {
       const tr = threeRef.current!;
-      const newGrassGeo = scatterGrassOnMesh(terrain.geometry, grassBladeCount(terrain.geometry));
+      const newGrassGeo = scatterGrassOnMesh(terrain.geometry, GRASS_COUNT);
       tr.grassMesh.geometry.dispose();
       tr.grassMesh.geometry = newGrassGeo;
     }

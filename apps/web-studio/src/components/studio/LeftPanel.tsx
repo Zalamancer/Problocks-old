@@ -24,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useStudio, type LeftPanelGroup, type LeftPanelTab } from '@/store/studio-store';
 import { ExplorerPanel } from './ExplorerPanel';
-import { sculptState, VOXEL_PRESETS, type SculptTool, type SculptAxis } from './sculpt-state';
+import { sculptState, VOXEL_PRESETS, type SculptTool } from './sculpt-state';
 import type { LucideIcon } from 'lucide-react';
 
 // ── Tab group definitions ─────────────────────────────────────────────
@@ -310,11 +310,11 @@ function TerrainPanel() {
 function useSculptState() {
   const [, forceRender] = useState(0);
   useEffect(() => sculptState.subscribe(() => forceRender(n => n + 1)), []);
-  return { tool: sculptState.tool, size: sculptState.size, strength: sculptState.strength, wireframe: sculptState.wireframe, voxelRes: sculptState.voxelRes, grassDensity: sculptState.grassDensity, axes: { ...sculptState.axes } };
+  return { tool: sculptState.tool, size: sculptState.size, strength: sculptState.strength, wireframe: sculptState.wireframe, voxelRes: sculptState.voxelRes };
 }
 
 function SculptPanel() {
-  const { tool, size, strength, wireframe, voxelRes, grassDensity, axes } = useSculptState();
+  const { tool, size, strength, wireframe, voxelRes } = useSculptState();
 
   const tools: { id: SculptTool; label: string; icon: string }[] = [
     { id: 'raise', label: 'Raise', icon: '▲' },
@@ -339,24 +339,6 @@ function SculptPanel() {
               )}>
               <span className="text-base">{t.icon}</span>
               {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Axis Lock */}
-      <div>
-        <h4 className="text-xs font-medium text-zinc-400 mb-2">Axis Lock</h4>
-        <div className="flex gap-1.5">
-          {(['x', 'y', 'z'] as SculptAxis[]).map((a) => (
-            <button key={a} onClick={() => sculptState.toggleAxis(a)}
-              className={cn(
-                'flex-1 py-2 rounded-lg text-[13px] font-bold transition-colors',
-                axes[a]
-                  ? a === 'x' ? 'bg-red-600/20 text-red-400' : a === 'y' ? 'bg-green-600/20 text-green-400' : 'bg-blue-600/20 text-blue-400'
-                  : 'bg-zinc-800 text-zinc-600',
-              )}>
-              {a.toUpperCase()}
             </button>
           ))}
         </div>
@@ -415,21 +397,6 @@ function SculptPanel() {
               {r}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Grass Density */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <h4 className="text-xs font-medium text-zinc-400">Grass Density</h4>
-          <span className="text-xs text-zinc-500 tabular-nums">{grassDensity} / m²</span>
-        </div>
-        <input type="range" min={5} max={500} step={5} value={grassDensity}
-          onChange={(e) => sculptState.setGrassDensity(parseInt(e.target.value))}
-          className="w-full accent-green-500" />
-        <div className="flex justify-between text-[10px] text-zinc-600 mt-0.5">
-          <span>5 / m²</span>
-          <span>500 / m²</span>
         </div>
       </div>
     </div>
