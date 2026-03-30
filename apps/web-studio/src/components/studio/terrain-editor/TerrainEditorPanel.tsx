@@ -2,10 +2,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { BiomeSettings } from './BiomeSettings';
 import { EditTab, defaultEditTabState } from './EditTab';
-import type { EditTabState } from './EditTab';
+import type { EditTabState, BrushTool } from './EditTab';
 import { HeightmapUploader, defaultHeightmapState } from './HeightmapUploader';
 import type { HeightmapUploaderState } from './HeightmapUploader';
 import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
+import { TerrainMaterial } from '@problocks/engine';
+import type { BrushToolType, BrushControllerConfig } from '@problocks/engine';
+import { useTerrainEditor } from './TerrainEditorContext';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -117,6 +120,41 @@ export function TerrainEditorPanel({ onGenerate, sim }: TerrainEditorPanelProps 
 
   // Edit tab state
   const [editState, setEditState] = useState<EditTabState>(defaultEditTabState);
+
+  // ── Terrain editor context — brush active + config sync ──
+  const terrainEditor = useTerrainEditor();
+
+  const BRUSH_TOOL_SET: Set<BrushTool> = new Set(['draw', 'sculpt', 'smooth', 'flatten', 'paint']);
+
+  // Set brushActive when Edit tab is active with a brush tool
+  useEffect(() => {
+    const isBrush = activeTab === 'edit' && BRUSH_TOOL_SET.has(editState.tool);
+    terrainEditor.setBrushActive(isBrush);
+    return () => terrainEditor.setBrushActive(false);
+  }, [activeTab, editState.tool]);
+
+  // Sync EditTab state → BrushController config
+  useEffect(() => {
+    const ctrl = terrainEditor.brushController;
+    if (!ctrl) return;
+    if (activeTab !== 'edit' || !BRUSH_TOOL_SET.has(editState.tool)) return;
+
+    ctrl.config = {
+      tool: editState.tool as BrushToolType,
+      shape: editState.shape,
+      size: editState.size,
+      height: editState.height,
+      strength: editState.strength,
+      material: editState.materialId as TerrainMaterial,
+      drawMode: editState.drawMode,
+      flattenMode: editState.flattenMode,
+      paintMode: editState.paintMode,
+      sourceMaterial: editState.sourceMaterialId as TerrainMaterial,
+      targetMaterial: editState.materialId as TerrainMaterial,
+      pivot: editState.pivot,
+      snapToVoxel: editState.snapToVoxel,
+    };
+  }, [activeTab, editState, terrainEditor.brushController]);
 
   // Heightmap import state
   const [heightmapState, setHeightmapState] = useState<HeightmapUploaderState>(defaultHeightmapState);
@@ -482,7 +520,40 @@ export function TerrainEditorPanel({ onGenerate, sim }: TerrainEditorPanelProps 
         )}
 
         {activeTab === 'edit' && (
-          <EditTab state={editState} onChange={setEditState} />
+          <>
+            {/* Undo/Redo bar */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={terrainEditor.undo}
+                disabled={!terrainEditor.canUndo}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1 text-[11px] py-1.5 rounded-md transition-colors',
+                  terrainEditor.canUndo
+                    ? 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                    : 'text-zinc-600 cursor-not-allowed',
+                )}
+                title="Undo (Ctrl+Z)"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h7a2 2 0 110 4H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M4 4L2 6l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Undo{terrainEditor.undoCount > 0 ? ` (${terrainEditor.undoCount})` : ''}
+              </button>
+              <button
+                onClick={terrainEditor.redo}
+                disabled={!terrainEditor.canRedo}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1 text-[11px] py-1.5 rounded-md transition-colors',
+                  terrainEditor.canRedo
+                    ? 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                    : 'text-zinc-600 cursor-not-allowed',
+                )}
+                title="Redo (Ctrl+Shift+Z)"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6H3a2 2 0 100 4h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M8 4l2 2-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Redo{terrainEditor.redoCount > 0 ? ` (${terrainEditor.redoCount})` : ''}
+              </button>
+            </div>
+            <EditTab state={editState} onChange={setEditState} />
+          </>
         )}
       </div>
     </div>

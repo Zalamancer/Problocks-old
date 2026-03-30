@@ -3,7 +3,10 @@ import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import { TerrainComponent, VoxelTerrainComponent, WaterComponent } from '@problocks/engine/core/component';
+import { TerrainBrushController, BrushCursor } from '@problocks/engine';
+import type { CursorMode } from '@problocks/engine';
 import { useStudio, StudioContext } from '@/store/studio-store';
+import { useTerrainEditorOptional } from './terrain-editor/TerrainEditorContext';
 
 /**
  * 3D Viewport — real Babylon.js + Rapier engine.
@@ -16,6 +19,8 @@ export function Viewport() {
   const [ready, setReady] = useState(false);
   const [hoveredEntity, setHoveredEntity] = useState<string | null>(null);
   const { entities, selectedEntityId, selectEntity, isPlaying } = useStudio();
+  const terrainEditor = useTerrainEditorOptional();
+  const brushDraggingRef = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -118,8 +123,9 @@ export function Viewport() {
 
       setReady(true);
 
-      // Click to select entities
+      // Click to select entities (skipped when brush is active)
       scene.onPointerDown = (_evt, pickResult) => {
+        if ((window as any).__problocks_brush_active) return;
         if (pickResult?.hit && pickResult.pickedMesh) {
           const meshName = pickResult.pickedMesh.name;
           // Skip internal meshes (ground, etc.)
@@ -130,8 +136,9 @@ export function Viewport() {
         }
       };
 
-      // Hover detection
+      // Hover detection (skipped when brush is active)
       scene.onPointerMove = (_evt, pickResult) => {
+        if ((window as any).__problocks_brush_active) return;
         if (pickResult?.hit && pickResult.pickedMesh && !pickResult.pickedMesh.name.startsWith('__')) {
           setHoveredEntity(pickResult.pickedMesh.name);
           canvas!.style.cursor = 'pointer';
@@ -253,6 +260,158 @@ export function Viewport() {
       sim.createWater(water);
     }
   }, [entities, ready]);
+
+  // Register BrushController + BrushCursor into TerrainEditorContext when voxel terrain exists
+  const brushCtrlRef = useRef<TerrainBrushController | null>(null);
+  const brushCursorRef = useRef<BrushCursor | null>(null);
+
+  useEffect(() => {
+    if (!engineRef.current || !ready || !terrainEditor) return;
+    const sim = engineRef.current.sim;
+    const grid = sim.getVoxelGrid();
+    const cm = sim.getChunkManager();
+    if (!grid || !cm) return;
+
+    // Create brush controller and cursor
+    const ctrl = new TerrainBrushController(grid, cm);
+    const scene = engineRef.current.renderer.getScene();
+    const cursor = new BrushCursor(scene);
+    cursor.hide();
+
+    brushCtrlRef.current = ctrl;
+    brushCursorRef.current = cursor;
+    terrainEditor.registerBrush(ctrl, cursor, cm);
+
+    return () => {
+      cursor.dispose();
+      brushCtrlRef.current = null;
+      brushCursorRef.current = null;
+      terrainEditor.unregisterBrush();
+    };
+  }, [ready, entities, terrainEditor?.registerBrush]);
+
+  // Brush pointer event handler — raycast to terrain and drive brush controller
+  useEffect(() => {
+    if (!engineRef.current || !ready || !terrainEditor) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const { brushActive, brushController, brushCursor, refreshUndoState } = terrainEditor;
+    if (!brushActive || !brushController || !brushCursor) {
+      brushCursorRef.current?.hide();
+      return;
+    }
+
+    const sim = engineRef.current.sim;
+    const scene = engineRef.current.renderer.getScene();
+    const tp = sim.getTerrainPhysics();
+    if (!tp) return;
+
+    function getPickRay(evt: PointerEvent) {
+      const rect = canvas!.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      return scene.createPickingRay(x, y, null, scene.activeCamera);
+    }
+
+    function getCursorMode(): CursorMode {
+      const tool = brushController!.config.tool;
+      if (tool === 'paint') return 'paint';
+      if (tool === 'smooth') return 'smooth';
+      if (brushController!.config.drawMode === 'subtract') return 'subtract';
+      return 'add';
+    }
+
+    const onPointerMove = (evt: PointerEvent) => {
+      const ray = getPickRay(evt);
+      const hit = tp!.raycast(
+        { x: ray.origin.x, y: ray.origin.y, z: ray.origin.z },
+        { x: ray.direction.x, y: ray.direction.y, z: ray.direction.z },
+        500,
+      );
+
+      if (!hit) {
+        brushCursor!.hide();
+        return;
+      }
+
+      brushCursor!.show();
+      const cfg = {
+        shape: brushController!.config.shape,
+        size: brushController!.config.size,
+        height: brushController!.config.height,
+        strength: brushController!.config.strength,
+        material: brushController!.config.material,
+        pivot: brushController!.config.pivot,
+        snapToVoxel: brushController!.config.snapToVoxel,
+      };
+      brushCursor!.update(hit.point, cfg, getCursorMode());
+
+      if (brushDraggingRef.current) {
+        brushController!.pointerMove(hit.point, evt.ctrlKey || evt.metaKey, evt.shiftKey);
+      }
+    };
+
+    const onPointerDown = (evt: PointerEvent) => {
+      if (evt.button !== 0) return; // left click only
+      const ray = getPickRay(evt);
+      const hit = tp!.raycast(
+        { x: ray.origin.x, y: ray.origin.y, z: ray.origin.z },
+        { x: ray.direction.x, y: ray.direction.y, z: ray.direction.z },
+        500,
+      );
+      if (!hit) return;
+
+      brushDraggingRef.current = true;
+      brushController!.pointerDown(hit.point, evt.ctrlKey || evt.metaKey, evt.shiftKey);
+      canvas!.setPointerCapture(evt.pointerId);
+    };
+
+    const onPointerUp = (evt: PointerEvent) => {
+      if (!brushDraggingRef.current) return;
+      brushDraggingRef.current = false;
+      brushController!.pointerUp();
+      refreshUndoState();
+      canvas!.releasePointerCapture(evt.pointerId);
+    };
+
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointerup', onPointerUp);
+
+    return () => {
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      brushCursor!.hide();
+    };
+  }, [ready, terrainEditor?.brushActive, terrainEditor?.brushController, terrainEditor?.brushCursor]);
+
+  // Sync brushActive to window global so scene handlers can check it
+  useEffect(() => {
+    (window as any).__problocks_brush_active = terrainEditor?.brushActive ?? false;
+  }, [terrainEditor?.brushActive]);
+
+  // Undo/redo keyboard shortcuts
+  useEffect(() => {
+    if (!terrainEditor) return;
+    const { brushActive, undo, redo } = terrainEditor;
+    if (!brushActive) return;
+
+    const onKeyDown = (evt: KeyboardEvent) => {
+      const mod = evt.ctrlKey || evt.metaKey;
+      if (!mod || evt.key.toLowerCase() !== 'z') return;
+      evt.preventDefault();
+      if (evt.shiftKey) {
+        redo();
+      } else {
+        undo();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [terrainEditor?.brushActive, terrainEditor?.undo, terrainEditor?.redo]);
 
   // Sync selected entity transform from store → engine when properties change
   useEffect(() => {
