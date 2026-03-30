@@ -1,7 +1,18 @@
 import type { BabylonRenderer } from '../renderer/babylon-renderer.js';
 import type { RapierPhysics } from '../physics/rapier-physics.js';
 import { generateHeightmap } from '../terrain/noise.js';
-import type { TerrainComponent, WaterComponent } from './component.js';
+import type { TerrainComponent, WaterComponent, VoxelTerrainComponent } from './component.js';
+
+// Voxel terrain subsystem imports
+import { VoxelGrid } from '../terrain/voxel/voxel-grid.js';
+import { ChunkMesher } from '../terrain/meshing/chunk-mesher.js';
+import { ChunkRenderer } from '../terrain/rendering/chunk-renderer.js';
+import { ChunkManager } from '../terrain/voxel/chunk-manager.js';
+import { TerrainPhysics } from '../terrain/physics/terrain-physics.js';
+import { TerrainGenerator } from '../terrain/generation/terrain-generator.js';
+import type { TerrainRegion } from '../terrain/generation/cave-generator.js';
+import { sampleSubmersion, computeBuoyancyForce, DEFAULT_BUOYANCY_CONFIG } from '../terrain/physics/voxel-buoyancy.js';
+import type { BuoyancyConfig } from '../terrain/physics/voxel-buoyancy.js';
 
 /**
  * The main simulation loop.
@@ -21,7 +32,7 @@ export class SimulationLoop {
   // Entity tracking: maps entity IDs to physics body IDs
   private entityToBody: Map<string, string> = new Map();
 
-  // Terrain & water state
+  // Terrain & water state (legacy heightmap)
   private terrainBodyId: string | null = null;
   private terrainHeightData: Float32Array | null = null;
   private terrainConfig: { width: number; depth: number; subdivisions: number; maxHeight: number } | null = null;
@@ -30,6 +41,13 @@ export class SimulationLoop {
   private waterDrag = 0.8;
   private waterWidth = 0;
   private waterDepth = 0;
+
+  // ── Voxel terrain state ────────────────────────────────────────────
+  private voxelGrid: VoxelGrid | null = null;
+  private chunkManager: ChunkManager | null = null;
+  private chunkRenderer: ChunkRenderer | null = null;
+  private terrainPhysics: TerrainPhysics | null = null;
+  private useVoxelTerrain = false;
 
   constructor(renderer: BabylonRenderer, physics: RapierPhysics) {
     this.renderer = renderer;
@@ -155,8 +173,74 @@ export class SimulationLoop {
     });
   }
 
+  // ── Voxel Terrain ──────────────────────────────────────────────────
+
+  /**
+   * Create voxel terrain: generates the grid, sets up chunk meshing,
+   * physics colliders, and per-frame updates via ChunkManager.
+   */
+  createVoxelTerrain(voxelTerrain: VoxelTerrainComponent): void {
+    this.useVoxelTerrain = true;
+
+    // 1. Core data structures
+    const grid = new VoxelGrid();
+    const scene = this.renderer.getScene();
+    const mesher = new ChunkMesher();
+    const chunkRenderer = new ChunkRenderer(scene);
+    const chunkManager = new ChunkManager(grid, mesher, chunkRenderer);
+
+    // 2. Terrain physics (trimesh colliders per chunk)
+    const rapierWorld = this.physics.getWorld();
+    const terrainPhysics = new TerrainPhysics(rapierWorld, grid);
+    chunkManager.setTerrainPhysics(terrainPhysics);
+
+    // 3. Generate terrain from component config
+    const region: TerrainRegion = {
+      minX: voxelTerrain.minX,
+      maxX: voxelTerrain.maxX,
+      minY: voxelTerrain.minY,
+      maxY: voxelTerrain.maxY,
+      minZ: voxelTerrain.minZ,
+      maxZ: voxelTerrain.maxZ,
+    };
+
+    const generator = new TerrainGenerator();
+    generator.generate(grid, region, {
+      biomes: voxelTerrain.biomes,
+      seed: voxelTerrain.seed,
+      biomeSize: voxelTerrain.biomeSize,
+      blending: voxelTerrain.blending,
+      caves: voxelTerrain.caves,
+    });
+
+    // 4. Mark all chunks dirty so they get meshed on first frames
+    chunkManager.forceRemeshAll();
+
+    // 5. Store references
+    this.voxelGrid = grid;
+    this.chunkManager = chunkManager;
+    this.chunkRenderer = chunkRenderer;
+    this.terrainPhysics = terrainPhysics;
+  }
+
+  /** Expose the voxel grid for external subsystems (editor, scripting). */
+  getVoxelGrid(): VoxelGrid | null {
+    return this.voxelGrid;
+  }
+
+  /** Expose the chunk manager for external subsystems. */
+  getChunkManager(): ChunkManager | null {
+    return this.chunkManager;
+  }
+
+  /** Expose terrain physics for raycasting and collider queries. */
+  getTerrainPhysics(): TerrainPhysics | null {
+    return this.terrainPhysics;
+  }
+
   /**
    * Get terrain height at a world position (bilinear interpolation).
+   * Legacy heightmap version.
    */
   getTerrainHeightAt(worldX: number, worldZ: number): number {
     if (!this.terrainHeightData || !this.terrainConfig) return 0;
@@ -234,8 +318,15 @@ export class SimulationLoop {
   /**
    * Apply buoyancy forces to entities submerged in water.
    * Uses dynamic heightfield for wave-aware buoyancy and creates ripples.
+   * Legacy path — used when voxel terrain is NOT active.
    */
   private applyBuoyancy(): void {
+    // Voxel terrain path: use voxel-accurate water detection
+    if (this.useVoxelTerrain && this.voxelGrid) {
+      this.applyVoxelBuoyancy();
+      return;
+    }
+
     if (this.waterLevel === null) return;
 
     for (const [entityId, bodyId] of this.entityToBody) {
@@ -270,6 +361,38 @@ export class SimulationLoop {
   }
 
   /**
+   * Voxel-accurate buoyancy: samples the VoxelGrid around each entity
+   * to determine submersion fraction, then applies Archimedes-style forces.
+   */
+  private applyVoxelBuoyancy(): void {
+    if (!this.voxelGrid) return;
+
+    for (const [, bodyId] of this.entityToBody) {
+      const pos = this.physics.getBodyPosition(bodyId);
+      // Approximate entity AABB as 1×1×1 around center
+      const halfSize = 0.5;
+      const result = sampleSubmersion(this.voxelGrid, {
+        minX: pos.x - halfSize,
+        minY: pos.y - halfSize,
+        minZ: pos.z - halfSize,
+        maxX: pos.x + halfSize,
+        maxY: pos.y + halfSize,
+        maxZ: pos.z + halfSize,
+      });
+
+      if (result.submersion > 0) {
+        const vel = this.physics.getVelocity(bodyId);
+        const force = computeBuoyancyForce(result.submersion, 1.0, vel, DEFAULT_BUOYANCY_CONFIG);
+        this.physics.applyForce(bodyId, {
+          x: force.dragX,
+          y: force.forceY + force.dragY,
+          z: force.dragZ,
+        });
+      }
+    }
+  }
+
+  /**
    * Sync physics positions to visual meshes.
    */
   private syncTransforms(): void {
@@ -288,6 +411,24 @@ export class SimulationLoop {
 
   stop(): void {
     this.running = false;
+  }
+
+  /** Dispose voxel terrain subsystems. */
+  disposeVoxelTerrain(): void {
+    if (this.chunkManager) {
+      this.chunkManager.disposeAll();
+      this.chunkManager = null;
+    }
+    if (this.chunkRenderer) {
+      this.chunkRenderer.dispose();
+      this.chunkRenderer = null;
+    }
+    if (this.terrainPhysics) {
+      this.terrainPhysics.dispose();
+      this.terrainPhysics = null;
+    }
+    this.voxelGrid = null;
+    this.useVoxelTerrain = false;
   }
 
   private tick = (): void => {
@@ -312,6 +453,12 @@ export class SimulationLoop {
 
     // Sync physics → renderer
     this.syncTransforms();
+
+    // Update voxel terrain chunk manager (LOD, meshing, unloading)
+    if (this.chunkManager) {
+      const cam = this.renderer.getCameraPosition();
+      this.chunkManager.update(cam);
+    }
 
     // Render
     this.renderer.render();

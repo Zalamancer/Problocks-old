@@ -189,6 +189,11 @@ export class RapierPhysics extends PhysicsEngine {
     return id;
   }
 
+  /** Expose the Rapier world for subsystems (e.g. TerrainPhysics). */
+  getWorld(): RAPIER.World {
+    return this.world;
+  }
+
   setGravity(x: number, y: number, z: number): void {
     this.world.gravity = new RAPIER.Vector3(x, y, z);
   }

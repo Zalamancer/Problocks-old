@@ -45,6 +45,10 @@ export {
   TerrainMaterial, MATERIAL_DEFS, materialNameToEnum, materialEnumToName,
   VOXEL_SIZE, CHUNK_SIZE, CHUNK_WORLD_SIZE,
   TerrainPhysics, ColliderRebuildQueue,
+  // Generation
+  TerrainGenerator, BIOMES, getBiomeIds, getBiome,
+  // Buoyancy (voxel-accurate)
+  sampleSubmersion, computeBuoyancyForce, DEFAULT_BUOYANCY_CONFIG,
   // Editor (Phase 4)
   iterateBrushVoxels, defaultBrushConfig,
   applyDraw, applySculpt, applySmooth, applyFlatten, applyPaint,
@@ -54,6 +58,10 @@ export {
 } from './terrain/index.js';
 export type {
   Voxel, ChunkMeshData, ChunkMeshResult, TerrainRaycastHit,
+  // Generation types
+  GenerateOptions, TerrainRegion, BiomeDefinition,
+  // Buoyancy types
+  BuoyancyBounds, BuoyancyResult, BuoyancyForce, BuoyancyConfig,
   // Editor types (Phase 4)
   BrushShape, BrushPivot, BrushConfig, BrushVoxel,
   FlattenMode, TerrainUndoEntry, BrushToolType, BrushControllerConfig, CursorMode,

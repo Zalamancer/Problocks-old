@@ -100,5 +100,34 @@ export {
 } from './api/terrain-script-bindings.js';
 export type { TerrainAPIState } from './api/terrain-script-bindings.js';
 
+// Web Worker Meshing (Phase 10.2)
+export { MeshWorkerPool, buildPaddedGrid, serializeOverrides } from './meshing/mesh-worker-pool.js';
+export type { WorkerMeshResult } from './meshing/mesh-worker-pool.js';
+export type { WorkerMeshRequest, WorkerMeshResponse, TransferableMesh } from './meshing/mesh-worker.js';
+
+// LOD System (Phase 10.1)
+export { LODLevel, LOD_STEP, LOD_GRID_SIZE, LOD_DISTANCE_SQ, getLODLevel, downsampleChunk, marchingCubesLOD, applyBoundarySkirts } from './meshing/lod-system.js';
+export type { LODChunkData } from './meshing/lod-system.js';
+
+// Performance Tracking (Phase 10.5)
+export { TerrainPerfTracker } from './rendering/perf-overlay.js';
+export type { TerrainPerfStats } from './rendering/perf-overlay.js';
+
+// Serialization (Phase 10.4)
+export {
+  TERRAIN_SAVE_VERSION,
+  rleEncode,
+  rleDecode,
+  serializeChunk,
+  saveTerrain,
+  saveTerrainJSON,
+  deserializeChunk,
+  loadTerrain,
+  loadTerrainJSON,
+  saveTerrainBinary,
+  loadTerrainBinary,
+} from './voxel/serialization.js';
+export type { SerializedChunk, SerializedTerrain } from './voxel/serialization.js';
+
 // Legacy noise (still used by generation)
 export { generateHeightmap, fbm, setNoiseSeed } from './noise.js';

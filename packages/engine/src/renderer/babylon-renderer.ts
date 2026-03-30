@@ -496,4 +496,10 @@ export class BabylonRenderer extends Renderer {
       this.waterMirror.renderList?.push(mesh);
     }
   }
+
+  /** Get the current camera world-space position. */
+  getCameraPosition(): { x: number; y: number; z: number } {
+    const pos = this.camera.position;
+    return { x: pos.x, y: pos.y, z: pos.z };
+  }
 }

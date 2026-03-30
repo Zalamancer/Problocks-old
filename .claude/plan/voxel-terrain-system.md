@@ -617,33 +617,33 @@ Replace the current heightmap-based terrain (`TerrainComponent` + `noise.ts` + `
 **Goal**: 60 FPS on mid-range hardware with large (512x128x512 voxel) terrains.
 
 ### 10.1 LOD System
-- [ ] 4 LOD levels: Full (every voxel), Half (every 2nd), Quarter (every 4th), Eighth (every 8th)
-- [ ] `getLODLevel(distance)`: Full <128, Half <256, Quarter <512, Eighth beyond
-- [ ] Downsample occupancy grid for lower LODs → run MC on smaller grid
-- [ ] LOD transition skirts to prevent seams
+- [x] 4 LOD levels: Full (every voxel), Half (every 2nd), Quarter (every 4th), Eighth (every 8th)
+- [x] `getLODLevel(distance)`: Full <128, Half <256, Quarter <512, Eighth beyond
+- [x] Downsample occupancy grid for lower LODs → run MC on smaller grid
+- [x] LOD transition skirts to prevent seams
 
 ### 10.2 Web Worker Meshing
-- [ ] Move `marchingCubes()` to a dedicated Web Worker
-- [ ] `postMessage()` with Transferable ArrayBuffers (zero-copy)
-- [ ] Main thread: queue dirty chunks → Worker: mesh them → Main thread: upload to GPU
-- [ ] Worker pool (2–4 workers) for parallel chunk meshing
+- [x] Move `marchingCubes()` to a dedicated Web Worker
+- [x] `postMessage()` with Transferable ArrayBuffers (zero-copy)
+- [x] Main thread: queue dirty chunks → Worker: mesh them → Main thread: upload to GPU
+- [x] Worker pool (2–4 workers) for parallel chunk meshing
 
 ### 10.3 Memory Management
-- [ ] `LOAD_DISTANCE = 320`, `UNLOAD_DISTANCE = 400` (world units)
-- [ ] Unload distant chunks: dispose mesh + collider, keep voxel data
-- [ ] Mesh object pool: reuse `BABYLON.Mesh` instances
-- [ ] Empty chunk pruning after edits
+- [x] `LOAD_DISTANCE = 320`, `UNLOAD_DISTANCE = 400` (world units)
+- [x] Unload distant chunks: dispose mesh + collider, keep voxel data
+- [x] Mesh object pool: reuse `BABYLON.Mesh` instances
+- [x] Empty chunk pruning after edits
 
 ### 10.4 Serialization
-- [ ] Run-length encoding (RLE) for chunk data: compress homogeneous regions
-- [ ] Save format: `{ version, voxelSize, chunkSize, chunks: SerializedChunk[] }`
-- [ ] Save/load terrain to project file (JSON or binary)
-- [ ] Typical compression: 20KB chunk → 1–5KB RLE
+- [x] Run-length encoding (RLE) for chunk data: compress homogeneous regions
+- [x] Save format: `{ version, voxelSize, chunkSize, chunks: SerializedChunk[] }`
+- [x] Save/load terrain to project file (JSON or binary)
+- [x] Typical compression: 20KB chunk → 1–5KB RLE
 
 ### 10.5 Profiling & Budgets
-- [ ] Frame budget tracking: mesh time, collider time, render time
-- [ ] Auto-reduce mesh budget if frame time exceeds 12ms
-- [ ] Performance overlay (dev mode): chunks loaded, triangles, frame times
+- [x] Frame budget tracking: mesh time, collider time, render time
+- [x] Auto-reduce mesh budget if frame time exceeds 12ms
+- [x] Performance overlay (dev mode): chunks loaded, triangles, frame times
 
 **MILESTONE**: 512x128x512 terrain at 60 FPS, save/load in <2 seconds.
 

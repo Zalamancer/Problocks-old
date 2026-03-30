@@ -75,6 +75,42 @@ export interface TerrainLayer {
 }
 
 /**
+ * Voxel terrain component — chunk-based voxel grid with Marching Cubes meshing.
+ * Replaces the heightmap-based TerrainComponent when useVoxelTerrain is enabled.
+ */
+export class VoxelTerrainComponent extends Component {
+  readonly type = 'voxel-terrain';
+  /** Whether the voxel terrain system is active */
+  enabled = false;
+
+  // ── Generation region (world units) ────────────────────────
+  /** Minimum X bound of the generated region */
+  minX = -128;
+  /** Maximum X bound of the generated region */
+  maxX = 128;
+  /** Minimum Y bound (bottom of terrain) */
+  minY = -32;
+  /** Maximum Y bound (top of terrain) */
+  maxY = 64;
+  /** Minimum Z bound of the generated region */
+  minZ = -128;
+  /** Maximum Z bound of the generated region */
+  maxZ = 128;
+
+  // ── Generation parameters ──────────────────────────────────
+  /** Biome IDs to blend (from BIOMES registry) */
+  biomes: string[] = ['grassland', 'desert'];
+  /** Random seed for procedural generation */
+  seed = 42;
+  /** World-unit spacing between biome Voronoi cells */
+  biomeSize = 120;
+  /** Biome transition smoothness 0–1 */
+  blending = 0.3;
+  /** Whether to carve procedural caves */
+  caves = true;
+}
+
+/**
  * Water component — visual water plane with buoyancy physics.
  */
 export class WaterComponent extends Component {

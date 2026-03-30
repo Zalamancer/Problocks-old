@@ -45,6 +45,10 @@ export class ChunkRenderer {
   private pulseObserver: BABYLON.Nullable<BABYLON.Observer<BABYLON.Scene>> = null;
   private triplanarMat: BABYLON.ShaderMaterial | null = null;
 
+  /** Mesh object pool for reuse (Phase 10.3). */
+  private meshPool: BABYLON.Mesh[] = [];
+  private readonly MAX_POOL_SIZE = 64;
+
   /** Enable triplanar texturing for solid terrain (Phase 9.4). */
   useTriplanar: boolean = false;
 
@@ -140,24 +144,24 @@ export class ChunkRenderer {
   disposeMesh(chunkKey: string): void {
     const solid = this.meshes.get(chunkKey);
     if (solid) {
-      solid.dispose();
+      this.releaseMesh(solid);
       this.meshes.delete(chunkKey);
     }
 
     const water = this.waterMeshes.get(chunkKey);
     if (water) {
-      water.dispose();
+      this.releaseMesh(water);
       this.waterMeshes.delete(chunkKey);
     }
 
     const emissive = this.emissiveMeshes.get(chunkKey);
     if (emissive) {
-      emissive.dispose();
+      this.releaseMesh(emissive);
       this.emissiveMeshes.delete(chunkKey);
     }
   }
 
-  /** Dispose every managed mesh. */
+  /** Dispose every managed mesh and drain the pool. */
   disposeAll(): void {
     for (const mesh of this.meshes.values()) {
       mesh.dispose();
@@ -173,9 +177,15 @@ export class ChunkRenderer {
       mesh.dispose();
     }
     this.emissiveMeshes.clear();
+
+    // Drain pool
+    for (const mesh of this.meshPool) {
+      mesh.dispose();
+    }
+    this.meshPool.length = 0;
   }
 
-  /** Clean up observers and materials. */
+  /** Clean up observers, materials, and pool. */
   dispose(): void {
     this.disposeAll();
     if (this.pulseObserver) {
@@ -188,6 +198,29 @@ export class ChunkRenderer {
     if (this.triplanarMat) {
       this.triplanarMat.dispose();
       this.triplanarMat = null;
+    }
+  }
+
+  // ── Mesh pool (Phase 10.3) ────────────────────────────────────────
+
+  /** Acquire a mesh from the pool or create a new one. */
+  private acquireMesh(name: string): BABYLON.Mesh {
+    if (this.meshPool.length > 0) {
+      const mesh = this.meshPool.pop()!;
+      mesh.name = name;
+      mesh.setEnabled(true);
+      return mesh;
+    }
+    return new BABYLON.Mesh(name, this.scene);
+  }
+
+  /** Return a mesh to the pool (or dispose if pool is full). */
+  private releaseMesh(mesh: BABYLON.Mesh): void {
+    if (this.meshPool.length < this.MAX_POOL_SIZE) {
+      mesh.setEnabled(false);
+      this.meshPool.push(mesh);
+    } else {
+      mesh.dispose();
     }
   }
 
@@ -205,7 +238,7 @@ export class ChunkRenderer {
     if (meshData.vertexCount === 0 || meshData.materialIds.length === 0) {
       const existing = this.emissiveMeshes.get(chunkKey);
       if (existing) {
-        existing.dispose();
+        this.releaseMesh(existing);
         this.emissiveMeshes.delete(chunkKey);
       }
       return;
@@ -230,7 +263,7 @@ export class ChunkRenderer {
     if (emissiveIdx.length === 0) {
       const existing = this.emissiveMeshes.get(chunkKey);
       if (existing) {
-        existing.dispose();
+        this.releaseMesh(existing);
         this.emissiveMeshes.delete(chunkKey);
       }
       return;
@@ -246,7 +279,7 @@ export class ChunkRenderer {
     if (mesh) {
       vertexData.applyToMesh(mesh, true);
     } else {
-      mesh = new BABYLON.Mesh(`terrain_emissive_${chunkKey}`, this.scene);
+      mesh = this.acquireMesh(`terrain_emissive_${chunkKey}`);
       vertexData.applyToMesh(mesh, true);
       this.emissiveMeshes.set(chunkKey, mesh);
     }
@@ -277,11 +310,11 @@ export class ChunkRenderer {
     material: BABYLON.Material,
     meshName: string,
   ): BABYLON.Mesh | null {
-    // No geometry — dispose existing and bail
+    // No geometry — release existing to pool and bail
     if (meshData.vertexCount === 0) {
       const existing = map.get(chunkKey);
       if (existing) {
-        existing.dispose();
+        this.releaseMesh(existing);
         map.delete(chunkKey);
       }
       return null;
@@ -294,12 +327,12 @@ export class ChunkRenderer {
     vertexData.indices = meshData.indices;
     vertexData.colors = expandRGBtoRGBA(meshData.colors, meshData.vertexCount);
 
-    // Reuse existing mesh or create a new one
+    // Reuse existing mesh or acquire from pool
     let mesh = map.get(chunkKey);
     if (mesh) {
       vertexData.applyToMesh(mesh, true);
     } else {
-      mesh = new BABYLON.Mesh(meshName, this.scene);
+      mesh = this.acquireMesh(meshName);
       vertexData.applyToMesh(mesh, true);
       map.set(chunkKey, mesh);
     }
