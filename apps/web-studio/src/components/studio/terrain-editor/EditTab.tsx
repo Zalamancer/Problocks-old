@@ -265,11 +265,15 @@ function NumberInput({
 interface EditTabProps {
   state: EditTabState;
   onChange: (state: EditTabState) => void;
+  onApplyFill?: () => void;
+  onApplyTransform?: () => void;
+  onCreateSea?: () => void;
+  onEvaporate?: () => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────
 
-export function EditTab({ state, onChange }: EditTabProps) {
+export function EditTab({ state, onChange, onApplyFill, onApplyTransform, onCreateSea, onEvaporate }: EditTabProps) {
   const update = useCallback(
     <K extends keyof EditTabState>(key: K, value: EditTabState[K]) => {
       onChange({ ...state, [key]: value });
@@ -525,7 +529,10 @@ export function EditTab({ state, onChange }: EditTabProps) {
             onChange={(v) => update('mergeEmpty', v)}
             label="Merge Empty (air overwrites)"
           />
-          <button className="w-full py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">
+          <button
+            onClick={onApplyTransform}
+            className="w-full py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors"
+          >
             Apply Transform
           </button>
         </div>
@@ -572,7 +579,10 @@ export function EditTab({ state, onChange }: EditTabProps) {
               </div>
             </div>
           )}
-          <button className="w-full py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">
+          <button
+            onClick={onApplyFill}
+            className="w-full py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors"
+          >
             Apply {state.fillMode === 'fill' ? 'Fill' : 'Replace'}
           </button>
         </div>
@@ -594,10 +604,16 @@ export function EditTab({ state, onChange }: EditTabProps) {
             />
           </div>
           <div className="flex gap-1.5">
-            <button className="flex-1 py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors">
+            <button
+              onClick={onCreateSea}
+              className="flex-1 py-1.5 text-[11px] font-medium rounded-md bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors"
+            >
               Create Sea
             </button>
-            <button className="flex-1 py-1.5 text-[11px] font-medium rounded-md bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors">
+            <button
+              onClick={onEvaporate}
+              className="flex-1 py-1.5 text-[11px] font-medium rounded-md bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+            >
               Evaporate
             </button>
           </div>

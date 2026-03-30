@@ -102,6 +102,11 @@ export class ChunkManager {
     this.forceRemeshAll();
   }
 
+  /** Replace the water material used by the chunk renderer. */
+  setWaterMaterial(mat: import("@babylonjs/core").Material): void {
+    this.renderer.setWaterMaterial(mat);
+  }
+
   /** Attach a Web Worker pool for off-thread meshing (Phase 10.2). */
   setWorkerPool(pool: MeshWorkerPool): void {
     this.workerPool = pool;

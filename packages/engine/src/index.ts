@@ -67,4 +67,24 @@ export type {
   FlattenMode, TerrainUndoEntry, BrushToolType, BrushControllerConfig, CursorMode,
   // Heightmap Import types (Phase 5)
   ImportRegion,
+  // Region editor types (Phase 6)
+  Vec3, RegionTransform,
+  // Water rendering types (Phase 7)
+  WaterProperties,
+  // Material color types (Phase 9)
+  ColorOverrideMap, TerrainColorPreset,
 } from './terrain/index.js';
+
+// Region editor operations (Phase 6)
+export {
+  TerrainSelection,
+  fillRegion, replaceInRegion,
+  transformRegion, defaultRegionTransform,
+  createSeaLevel, evaporateWater,
+} from './terrain/index.js';
+
+// Renderers (Phase 7/9)
+export { WaterVoxelRenderer, defaultWaterProperties, GrassRenderer } from './terrain/index.js';
+
+// Material color presets (Phase 9)
+export { TERRAIN_COLOR_PRESETS } from './terrain/index.js';

@@ -19,6 +19,9 @@ import {
 import type { TerrainBrushController } from '@problocks/engine';
 import type { BrushCursor } from '@problocks/engine';
 import type { ChunkManager } from '@problocks/engine';
+import type { VoxelGrid } from '@problocks/engine';
+import type { WaterVoxelRenderer } from '@problocks/engine';
+import type { GrassRenderer } from '@problocks/engine';
 
 // ── Context value ─────────────────────────────────────────────────
 
@@ -31,9 +34,19 @@ export interface TerrainEditorContextValue {
   brushController: TerrainBrushController | null;
   brushCursor: BrushCursor | null;
   chunkManager: ChunkManager | null;
+  voxelGrid: VoxelGrid | null;
+  waterRenderer: WaterVoxelRenderer | null;
+  grassRenderer: GrassRenderer | null;
 
   /** Called by Viewport to register engine objects */
-  registerBrush: (ctrl: TerrainBrushController, cursor: BrushCursor, cm: ChunkManager) => void;
+  registerBrush: (
+    ctrl: TerrainBrushController,
+    cursor: BrushCursor,
+    cm: ChunkManager,
+    grid: VoxelGrid,
+    water: WaterVoxelRenderer | null,
+    grass: GrassRenderer | null,
+  ) => void;
   unregisterBrush: () => void;
 
   /** Undo/redo state for UI */
@@ -66,25 +79,44 @@ export function TerrainEditorProvider({ children }: { children: React.ReactNode 
   const [brushController, setBrushController] = useState<TerrainBrushController | null>(null);
   const [brushCursor, setBrushCursor] = useState<BrushCursor | null>(null);
   const [chunkManager, setChunkManager] = useState<ChunkManager | null>(null);
+  const [voxelGrid, setVoxelGrid] = useState<VoxelGrid | null>(null);
+  const [waterRenderer, setWaterRenderer] = useState<WaterVoxelRenderer | null>(null);
+  const [grassRenderer, setGrassRenderer] = useState<GrassRenderer | null>(null);
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false, undoCount: 0, redoCount: 0 });
 
   const ctrlRef = useRef<TerrainBrushController | null>(null);
   const cmRef = useRef<ChunkManager | null>(null);
+  const gridRef = useRef<VoxelGrid | null>(null);
 
-  const registerBrush = useCallback((ctrl: TerrainBrushController, cursor: BrushCursor, cm: ChunkManager) => {
+  const registerBrush = useCallback((
+    ctrl: TerrainBrushController,
+    cursor: BrushCursor,
+    cm: ChunkManager,
+    grid: VoxelGrid,
+    water: WaterVoxelRenderer | null,
+    grass: GrassRenderer | null,
+  ) => {
     ctrlRef.current = ctrl;
     cmRef.current = cm;
+    gridRef.current = grid;
     setBrushController(ctrl);
     setBrushCursor(cursor);
     setChunkManager(cm);
+    setVoxelGrid(grid);
+    setWaterRenderer(water);
+    setGrassRenderer(grass);
   }, []);
 
   const unregisterBrush = useCallback(() => {
     ctrlRef.current = null;
     cmRef.current = null;
+    gridRef.current = null;
     setBrushController(null);
     setBrushCursor(null);
     setChunkManager(null);
+    setVoxelGrid(null);
+    setWaterRenderer(null);
+    setGrassRenderer(null);
     setBrushActive(false);
     setUndoState({ canUndo: false, canRedo: false, undoCount: 0, redoCount: 0 });
   }, []);
@@ -124,13 +156,16 @@ export function TerrainEditorProvider({ children }: { children: React.ReactNode 
     brushController,
     brushCursor,
     chunkManager,
+    voxelGrid,
+    waterRenderer,
+    grassRenderer,
     registerBrush,
     unregisterBrush,
     ...undoState,
     undo,
     redo,
     refreshUndoState,
-  }), [brushActive, brushController, brushCursor, chunkManager, registerBrush, unregisterBrush, undoState, undo, redo, refreshUndoState]);
+  }), [brushActive, brushController, brushCursor, chunkManager, voxelGrid, waterRenderer, grassRenderer, registerBrush, unregisterBrush, undoState, undo, redo, refreshUndoState]);
 
   return (
     <TerrainEditorCtx.Provider value={value}>

@@ -39,7 +39,7 @@ export class ChunkRenderer {
   private meshes: Map<string, BABYLON.Mesh> = new Map();
   private waterMeshes: Map<string, BABYLON.Mesh> = new Map();
   private solidMaterial: BABYLON.StandardMaterial;
-  private waterMaterial: BABYLON.StandardMaterial;
+  private waterMaterial: BABYLON.Material;
   private emissiveMeshes: Map<string, BABYLON.Mesh> = new Map();
   private emissiveMaterial: BABYLON.StandardMaterial;
   private pulseObserver: BABYLON.Nullable<BABYLON.Observer<BABYLON.Scene>> = null;
@@ -52,6 +52,14 @@ export class ChunkRenderer {
   /** Enable triplanar texturing for solid terrain (Phase 9.4). */
   useTriplanar: boolean = false;
 
+  /** Replace the water material and update all existing water meshes. */
+  setWaterMaterial(mat: BABYLON.Material): void {
+    this.waterMaterial = mat;
+    for (const mesh of this.waterMeshes.values()) {
+      mesh.material = mat;
+    }
+  }
+
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
 
@@ -61,10 +69,11 @@ export class ChunkRenderer {
     this.solidMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
     // Water material — translucent, double-sided, slight sheen
-    this.waterMaterial = new BABYLON.StandardMaterial("terrain_water_mat", scene);
-    this.waterMaterial.alpha = 0.6;
-    this.waterMaterial.backFaceCulling = false;
-    this.waterMaterial.specularColor = new BABYLON.Color3(0.6, 0.6, 0.7);
+    const waterMat = new BABYLON.StandardMaterial("terrain_water_mat", scene);
+    waterMat.alpha = 0.6;
+    waterMat.backFaceCulling = false;
+    waterMat.specularColor = new BABYLON.Color3(0.6, 0.6, 0.7);
+    this.waterMaterial = waterMat;
 
     // Emissive material — for CrackedLava and other glowing surfaces
     this.emissiveMaterial = new BABYLON.StandardMaterial("terrain_emissive_mat", scene);

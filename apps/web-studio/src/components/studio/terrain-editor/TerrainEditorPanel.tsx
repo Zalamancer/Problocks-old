@@ -6,8 +6,16 @@ import type { EditTabState, BrushTool } from './EditTab';
 import { HeightmapUploader, defaultHeightmapState } from './HeightmapUploader';
 import type { HeightmapUploaderState } from './HeightmapUploader';
 import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
-import { TerrainMaterial } from '@problocks/engine';
-import type { BrushToolType, BrushControllerConfig } from '@problocks/engine';
+import {
+  TerrainMaterial,
+  TerrainSelection,
+  fillRegion, replaceInRegion,
+  transformRegion,
+  createSeaLevel, evaporateWater,
+  TERRAIN_COLOR_PRESETS,
+  CHUNK_WORLD_SIZE,
+} from '@problocks/engine';
+import type { BrushToolType, BrushControllerConfig, TerrainColorPreset } from '@problocks/engine';
 import { useTerrainEditor } from './TerrainEditorContext';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -239,6 +247,153 @@ export function TerrainEditorPanel({ onGenerate, sim }: TerrainEditorPanelProps 
       setImportProgress(p);
     }, 120);
   }, [heightmapState]);
+
+  // ── Helper: create a TerrainSelection covering the entire loaded grid ──
+  const createFullGridSelection = useCallback(() => {
+    const grid = terrainEditor.voxelGrid;
+    if (!grid) return null;
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    for (const chunk of grid.getAllChunks()) {
+      const o = chunk.worldOrigin;
+      minX = Math.min(minX, o.x);
+      minY = Math.min(minY, o.y);
+      minZ = Math.min(minZ, o.z);
+      maxX = Math.max(maxX, o.x + CHUNK_WORLD_SIZE);
+      maxY = Math.max(maxY, o.y + CHUNK_WORLD_SIZE);
+      maxZ = Math.max(maxZ, o.z + CHUNK_WORLD_SIZE);
+    }
+
+    if (!isFinite(minX)) return null;
+    return new TerrainSelection({ x: minX, y: minY, z: minZ }, { x: maxX, y: maxY, z: maxZ });
+  }, [terrainEditor.voxelGrid]);
+
+  // ── Helper: get all chunk keys for undo ──
+  const getAllChunkKeys = useCallback(() => {
+    const grid = terrainEditor.voxelGrid;
+    if (!grid) return [];
+    const keys: string[] = [];
+    for (const chunk of grid.getAllChunks()) {
+      keys.push(`${chunk.cx},${chunk.cy},${chunk.cz}`);
+    }
+    return keys;
+  }, [terrainEditor.voxelGrid]);
+
+  // ── 1. Fill & Replace ──
+  const handleApplyFill = useCallback(() => {
+    const grid = terrainEditor.voxelGrid;
+    const cm = terrainEditor.chunkManager;
+    const ctrl = terrainEditor.brushController;
+    if (!grid || !cm || !ctrl) return;
+
+    const selection = createFullGridSelection();
+    if (!selection) return;
+
+    const chunkKeys = getAllChunkKeys();
+    ctrl.undoStack.beginEdit(editState.fillMode === 'fill' ? 'Fill Region' : 'Replace Region', chunkKeys, grid);
+
+    if (editState.fillMode === 'fill') {
+      fillRegion(grid, selection, editState.fillMaterialId as TerrainMaterial);
+    } else {
+      replaceInRegion(grid, selection, editState.replaceSrcId as TerrainMaterial, editState.replaceDstId as TerrainMaterial);
+    }
+
+    ctrl.undoStack.endEdit(grid);
+    cm.forceRemeshAll();
+    terrainEditor.refreshUndoState();
+  }, [editState.fillMode, editState.fillMaterialId, editState.replaceSrcId, editState.replaceDstId, terrainEditor, createFullGridSelection, getAllChunkKeys]);
+
+  // ── 2. Transform ──
+  const handleApplyTransform = useCallback(() => {
+    const grid = terrainEditor.voxelGrid;
+    const cm = terrainEditor.chunkManager;
+    const ctrl = terrainEditor.brushController;
+    if (!grid || !cm || !ctrl) return;
+
+    const selection = createFullGridSelection();
+    if (!selection) return;
+
+    const chunkKeys = getAllChunkKeys();
+    ctrl.undoStack.beginEdit('Transform Region', chunkKeys, grid);
+
+    transformRegion(grid, selection, {
+      position: { x: editState.transformX, y: editState.transformY, z: editState.transformZ },
+      rotationY: editState.transformRotY,
+      scale: { x: editState.transformScaleX, y: editState.transformScaleY, z: editState.transformScaleZ },
+    }, editState.mergeEmpty);
+
+    ctrl.undoStack.endEdit(grid);
+    cm.forceRemeshAll();
+    terrainEditor.refreshUndoState();
+  }, [editState.transformX, editState.transformY, editState.transformZ, editState.transformRotY, editState.transformScaleX, editState.transformScaleY, editState.transformScaleZ, editState.mergeEmpty, terrainEditor, createFullGridSelection, getAllChunkKeys]);
+
+  // ── 3. Sea Level ──
+  const handleCreateSea = useCallback(() => {
+    const grid = terrainEditor.voxelGrid;
+    const cm = terrainEditor.chunkManager;
+    const ctrl = terrainEditor.brushController;
+    if (!grid || !cm || !ctrl) return;
+
+    const selection = createFullGridSelection();
+    if (!selection) return;
+
+    const chunkKeys = getAllChunkKeys();
+    ctrl.undoStack.beginEdit('Create Sea Level', chunkKeys, grid);
+    createSeaLevel(grid, selection, editState.waterLevel);
+    ctrl.undoStack.endEdit(grid);
+    cm.forceRemeshAll();
+    terrainEditor.refreshUndoState();
+  }, [editState.waterLevel, terrainEditor, createFullGridSelection, getAllChunkKeys]);
+
+  const handleEvaporate = useCallback(() => {
+    const grid = terrainEditor.voxelGrid;
+    const cm = terrainEditor.chunkManager;
+    const ctrl = terrainEditor.brushController;
+    if (!grid || !cm || !ctrl) return;
+
+    const selection = createFullGridSelection();
+    if (!selection) return;
+
+    const chunkKeys = getAllChunkKeys();
+    ctrl.undoStack.beginEdit('Evaporate Water', chunkKeys, grid);
+    evaporateWater(grid, selection);
+    ctrl.undoStack.endEdit(grid);
+    cm.forceRemeshAll();
+    terrainEditor.refreshUndoState();
+  }, [terrainEditor, createFullGridSelection, getAllChunkKeys]);
+
+  // ── 4. Water Properties — sync to WaterVoxelRenderer ──
+  useEffect(() => {
+    const wr = terrainEditor.waterRenderer;
+    if (!wr) return;
+    wr.setProperties({
+      color: { r: editState.waterColorR / 255, g: editState.waterColorG / 255, b: editState.waterColorB / 255 },
+      reflectance: editState.waterReflectance,
+      transparency: editState.waterTransparency,
+      waveSize: editState.waterWaveSize,
+      waveSpeed: editState.waterWaveSpeed,
+    });
+  }, [editState.waterColorR, editState.waterColorG, editState.waterColorB, editState.waterReflectance, editState.waterTransparency, editState.waterWaveSize, editState.waterWaveSpeed, terrainEditor.waterRenderer]);
+
+  // ── 5. Colors / Decoration — sync to GrassRenderer + ChunkManager ──
+  useEffect(() => {
+    const gr = terrainEditor.grassRenderer;
+    const cm = terrainEditor.chunkManager;
+    if (!gr || !cm) return;
+    gr.decoration = editState.decoration;
+    gr.grassLength = editState.grassLength;
+    // Re-mesh to rebuild grass blades with new settings
+    cm.forceRemeshAll();
+  }, [editState.decoration, editState.grassLength, terrainEditor.grassRenderer, terrainEditor.chunkManager]);
+
+  useEffect(() => {
+    const cm = terrainEditor.chunkManager;
+    if (!cm) return;
+    const overrides = TERRAIN_COLOR_PRESETS[editState.colorPreset as TerrainColorPreset] ?? null;
+    cm.setColorOverrides(overrides);
+  }, [editState.colorPreset, terrainEditor.chunkManager]);
 
   return (
     <div className="h-full flex flex-col bg-zinc-900/80 backdrop-blur-xl border border-white/[0.06] rounded-xl overflow-hidden">
@@ -552,7 +707,14 @@ export function TerrainEditorPanel({ onGenerate, sim }: TerrainEditorPanelProps 
                 Redo{terrainEditor.redoCount > 0 ? ` (${terrainEditor.redoCount})` : ''}
               </button>
             </div>
-            <EditTab state={editState} onChange={setEditState} />
+            <EditTab
+              state={editState}
+              onChange={setEditState}
+              onApplyFill={handleApplyFill}
+              onApplyTransform={handleApplyTransform}
+              onCreateSea={handleCreateSea}
+              onEvaporate={handleEvaporate}
+            />
           </>
         )}
       </div>

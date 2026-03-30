@@ -3,7 +3,7 @@ import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import { TerrainComponent, VoxelTerrainComponent, WaterComponent } from '@problocks/engine/core/component';
-import { TerrainBrushController, BrushCursor } from '@problocks/engine';
+import { TerrainBrushController, BrushCursor, WaterVoxelRenderer, GrassRenderer } from '@problocks/engine';
 import type { CursorMode } from '@problocks/engine';
 import { useStudio, StudioContext } from '@/store/studio-store';
 import { useTerrainEditorOptional } from './terrain-editor/TerrainEditorContext';
@@ -261,7 +261,7 @@ export function Viewport() {
     }
   }, [entities, ready]);
 
-  // Register BrushController + BrushCursor into TerrainEditorContext when voxel terrain exists
+  // Register BrushController + BrushCursor + renderers into TerrainEditorContext when voxel terrain exists
   const brushCtrlRef = useRef<TerrainBrushController | null>(null);
   const brushCursorRef = useRef<BrushCursor | null>(null);
 
@@ -278,12 +278,22 @@ export function Viewport() {
     const cursor = new BrushCursor(scene);
     cursor.hide();
 
+    // Create WaterVoxelRenderer — replace ChunkRenderer's default water material
+    const waterRenderer = new WaterVoxelRenderer(scene);
+    cm.setWaterMaterial(waterRenderer.getMaterial());
+
+    // Create GrassRenderer — register with ChunkManager for per-chunk grass updates
+    const grassRenderer = new GrassRenderer(scene);
+    cm.setGrassRenderer(grassRenderer);
+
     brushCtrlRef.current = ctrl;
     brushCursorRef.current = cursor;
-    terrainEditor.registerBrush(ctrl, cursor, cm);
+    terrainEditor.registerBrush(ctrl, cursor, cm, grid, waterRenderer, grassRenderer);
 
     return () => {
       cursor.dispose();
+      waterRenderer.dispose();
+      grassRenderer.dispose();
       brushCtrlRef.current = null;
       brushCursorRef.current = null;
       terrainEditor.unregisterBrush();
