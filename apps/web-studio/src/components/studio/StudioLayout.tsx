@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { TopMenuBar } from './TopMenuBar';
 import { LeftPanel, LeftPanelToggle } from './LeftPanel';
 import { Viewport } from './Viewport';
+import { GrassDemo } from './GrassDemo';
 import { PropertiesPanel } from './PropertiesPanel';
 import { ScriptEditor } from './ScriptEditor';
 import { useStudio } from '@/store/studio-store';
@@ -24,6 +26,7 @@ import { TerrainEditorProvider } from './terrain-editor/TerrainEditorContext';
  */
 export function StudioLayout() {
   const { marketplaceOpen } = useStudio();
+  const [showGrass, setShowGrass] = useState(false);
 
   return (
     <TerrainEditorProvider>
@@ -39,9 +42,15 @@ export function StudioLayout() {
 
           {/* Center — Viewport + Script Editor stacked */}
           <div className="flex-1 flex flex-col overflow-hidden gap-1.5">
-            {/* Viewport */}
-            <div className="flex-1 bg-zinc-900/80 backdrop-blur-xl border border-white/[0.06] rounded-xl overflow-hidden">
-              <Viewport />
+            {/* Viewport / Grass Demo toggle */}
+            <div className="relative flex-1 bg-zinc-900/80 backdrop-blur-xl border border-white/[0.06] rounded-xl overflow-hidden">
+              {showGrass ? <GrassDemo /> : <Viewport />}
+              <button
+                onClick={() => setShowGrass(!showGrass)}
+                className="absolute top-2 right-2 z-10 rounded bg-emerald-600/80 px-3 py-1 text-[11px] text-white hover:bg-emerald-500/80"
+              >
+                {showGrass ? 'Back to Viewport' : 'Grass Demo'}
+              </button>
             </div>
             {/* Script Editor */}
             <div className="h-[280px] shrink-0 bg-zinc-900/80 backdrop-blur-xl border border-white/[0.06] rounded-xl overflow-hidden">
