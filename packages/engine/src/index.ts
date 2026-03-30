@@ -91,3 +91,8 @@ export { TERRAIN_COLOR_PRESETS } from './terrain/index.js';
 
 // Player character controller
 export { CharacterController } from './player/character-controller.js';
+
+// Three.js renderers
+export { ThreeRenderer } from './renderer/three-renderer.js';
+export { ThreeChunkRenderer } from './terrain/rendering/three-chunk-renderer.js';
+export { ThreeGrassRenderer } from './terrain/rendering/three-grass-renderer.js';
