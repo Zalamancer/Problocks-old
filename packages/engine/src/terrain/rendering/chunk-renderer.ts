@@ -63,9 +63,9 @@ export class ChunkRenderer {
   constructor(scene: BABYLON.Scene) {
     this.scene = scene;
 
-    // Solid terrain material — dim specular
+    // Solid terrain material — dim specular, double-sided for MC winding
     this.solidMaterial = new BABYLON.StandardMaterial("terrain_solid_mat", scene);
-    this.solidMaterial.backFaceCulling = true;
+    this.solidMaterial.backFaceCulling = false;
     this.solidMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
     // Water material — translucent, double-sided, slight sheen
@@ -77,7 +77,7 @@ export class ChunkRenderer {
 
     // Emissive material — for CrackedLava and other glowing surfaces
     this.emissiveMaterial = new BABYLON.StandardMaterial("terrain_emissive_mat", scene);
-    this.emissiveMaterial.backFaceCulling = true;
+    this.emissiveMaterial.backFaceCulling = false;
     this.emissiveMaterial.specularColor = new BABYLON.Color3(0.2, 0.15, 0.1);
     this.emissiveMaterial.emissiveColor = new BABYLON.Color3(232 / 255, 156 / 255, 74 / 255);
     this.emissiveMaterial.zOffset = -1;

@@ -3,7 +3,7 @@ import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import { TerrainComponent, VoxelTerrainComponent, WaterComponent } from '@problocks/engine/core/component';
-import { TerrainBrushController, BrushCursor, WaterVoxelRenderer, GrassRenderer } from '@problocks/engine';
+import { TerrainBrushController, BrushCursor, WaterVoxelRenderer, GrassRenderer, CharacterController } from '@problocks/engine';
 import type { CursorMode } from '@problocks/engine';
 import { useStudio, StudioContext } from '@/store/studio-store';
 import { useTerrainEditorOptional } from './terrain-editor/TerrainEditorContext';
@@ -21,6 +21,8 @@ export function Viewport() {
   const { entities, selectedEntityId, selectEntity, isPlaying } = useStudio();
   const terrainEditor = useTerrainEditorOptional();
   const brushDraggingRef = useRef(false);
+  const characterRef = useRef<CharacterController | null>(null);
+  const characterObserverRef = useRef<any>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -195,15 +197,45 @@ export function Viewport() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Start/stop physics when Play/Stop is toggled
+  // Start/stop physics when Play/Stop is toggled + spawn/despawn character
   useEffect(() => {
     if (!engineRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const { renderer, sim } = engineRef.current;
+    const scene = renderer.getScene();
+
     if (isPlaying) {
-      engineRef.current.renderer.stopRenderLoop(); // sim takes over rendering
-      engineRef.current.sim.start();
+      renderer.stopRenderLoop(); // sim takes over rendering
+      sim.start();
+
+      // Spawn character controller
+      const character = new CharacterController(scene);
+      const originalCamera = scene.activeCamera!;
+      character.activate(canvas);
+      characterRef.current = character;
+
+      // Update character every frame
+      characterObserverRef.current = scene.onBeforeRenderObservable.add(() => {
+        character.update();
+      });
     } else {
-      engineRef.current.sim.stop();
-      engineRef.current.renderer.startRenderLoop(); // engine loop resumes
+      // Despawn character
+      if (characterRef.current) {
+        const originalCamera = scene.cameras.find(c => c.name === 'camera');
+        if (originalCamera) {
+          characterRef.current.deactivate(originalCamera, canvas);
+        }
+        if (characterObserverRef.current) {
+          scene.onBeforeRenderObservable.remove(characterObserverRef.current);
+          characterObserverRef.current = null;
+        }
+        characterRef.current.dispose();
+        characterRef.current = null;
+      }
+
+      sim.stop();
+      renderer.startRenderLoop(); // engine loop resumes
     }
   }, [isPlaying]);
 
@@ -476,6 +508,11 @@ export function Viewport() {
           </span>
         )}
       </div>
+      {isPlaying && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 rounded bg-black/70 px-3 py-1 text-[11px] text-gray-300">
+          WASD to move | Space to jump | Mouse to look
+        </div>
+      )}
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80">
           <span className="text-sm text-gray-400">Loading engine...</span>

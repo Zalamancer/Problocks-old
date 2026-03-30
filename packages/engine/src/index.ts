@@ -88,3 +88,6 @@ export { WaterVoxelRenderer, defaultWaterProperties, GrassRenderer } from './ter
 
 // Material color presets (Phase 9)
 export { TERRAIN_COLOR_PRESETS } from './terrain/index.js';
+
+// Player character controller
+export { CharacterController } from './player/character-controller.js';

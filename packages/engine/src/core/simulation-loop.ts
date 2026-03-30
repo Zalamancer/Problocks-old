@@ -48,6 +48,7 @@ export class SimulationLoop {
   private chunkRenderer: ChunkRenderer | null = null;
   private terrainPhysics: TerrainPhysics | null = null;
   private useVoxelTerrain = false;
+  private terrainEditObserver: any = null;
 
   constructor(renderer: BabylonRenderer, physics: RapierPhysics) {
     this.renderer = renderer;
@@ -221,6 +222,17 @@ export class SimulationLoop {
     this.chunkManager = chunkManager;
     this.chunkRenderer = chunkRenderer;
     this.terrainPhysics = terrainPhysics;
+
+    // 6. Hide editor grid — voxel terrain replaces it
+    this.renderer.hideGridGround();
+
+    // 7. Scene observer: update chunks in edit mode (when sim is NOT running)
+    this.terrainEditObserver = scene.onBeforeRenderObservable.add(() => {
+      if (!this.running && this.chunkManager) {
+        const cam = this.renderer.getCameraPosition();
+        this.chunkManager.update(cam);
+      }
+    });
   }
 
   /** Expose the voxel grid for external subsystems (editor, scripting). */
@@ -415,6 +427,12 @@ export class SimulationLoop {
 
   /** Dispose voxel terrain subsystems. */
   disposeVoxelTerrain(): void {
+    if (this.terrainEditObserver) {
+      const scene = this.renderer.getScene();
+      scene.onBeforeRenderObservable.remove(this.terrainEditObserver);
+      this.terrainEditObserver = null;
+    }
+    this.renderer.showGridGround();
     if (this.chunkManager) {
       this.chunkManager.disposeAll();
       this.chunkManager = null;

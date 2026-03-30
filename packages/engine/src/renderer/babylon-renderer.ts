@@ -48,6 +48,7 @@ export class BabylonRenderer extends Renderer {
   private waterHeightTex: BABYLON.RawTexture | null = null;
   private waterHeightBuf: Float32Array | null = null;
   private skybox: BABYLON.Mesh | null = null;
+  private gridGround: BABYLON.Mesh | null = null;
   private waterSim: WaterSimulation | null = null;
   private waterConfig: { width: number; depth: number } | null = null;
   private waterUpdateCb: (() => void) | null = null;
@@ -70,12 +71,12 @@ export class BabylonRenderer extends Renderer {
 
     // Camera
     this.camera = new BABYLON.ArcRotateCamera(
-      'camera', -Math.PI / 4, Math.PI / 3, 40,
-      new BABYLON.Vector3(0, 5, 0), this.scene,
+      'camera', -Math.PI / 4, Math.PI / 3, 80,
+      new BABYLON.Vector3(0, 10, 0), this.scene,
     );
     this.camera.attachControl(canvas, true);
     this.camera.lowerRadiusLimit = 2;
-    this.camera.upperRadiusLimit = 200;
+    this.camera.upperRadiusLimit = 500;
     this.camera.wheelPrecision = 20;
 
     // Disable default wheel zoom — Viewport handles wheel events for orbit/zoom
@@ -102,8 +103,8 @@ export class BabylonRenderer extends Renderer {
     skybox.infiniteDistance = true;
     this.skybox = skybox;
 
-    // Grid ground
-    const ground = BABYLON.MeshBuilder.CreateGround('__ground', { width: 30, height: 30 }, this.scene);
+    // Grid ground (hidden when voxel terrain is active)
+    this.gridGround = BABYLON.MeshBuilder.CreateGround('__ground', { width: 30, height: 30 }, this.scene);
     const groundMat = new GridMaterial('groundMat', this.scene);
     groundMat.majorUnitFrequency = 5;
     groundMat.minorUnitVisibility = 0.3;
@@ -112,7 +113,17 @@ export class BabylonRenderer extends Renderer {
     groundMat.mainColor = new BABYLON.Color3(0.15, 0.15, 0.2);
     groundMat.lineColor = new BABYLON.Color3(0.3, 0.3, 0.4);
     groundMat.opacity = 0.9;
-    ground.material = groundMat;
+    this.gridGround.material = groundMat;
+  }
+
+  /** Hide the editor grid ground (call when voxel terrain is active). */
+  hideGridGround(): void {
+    if (this.gridGround) this.gridGround.setEnabled(false);
+  }
+
+  /** Show the editor grid ground. */
+  showGridGround(): void {
+    if (this.gridGround) this.gridGround.setEnabled(true);
   }
 
   createMesh(
