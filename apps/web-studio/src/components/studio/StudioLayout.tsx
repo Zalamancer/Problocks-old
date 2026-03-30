@@ -4,7 +4,6 @@ import { ViewportThree } from './ViewportThree';
 import { PropertiesPanel } from './PropertiesPanel';
 import { ScriptEditor } from './ScriptEditor';
 import { useStudio } from '@/store/studio-store';
-import { TerrainEditorProvider } from './terrain-editor/TerrainEditorContext';
 
 /**
  * Main studio layout — AutoAnimation-style 3-panel glass design:
@@ -26,7 +25,6 @@ export function StudioLayout() {
   const { marketplaceOpen } = useStudio();
 
   return (
-    <TerrainEditorProvider>
     <div className="h-screen w-screen flex flex-col bg-zinc-950 overflow-hidden text-zinc-100 font-sans p-1.5 gap-1.5">
       {/* Top menu bar */}
       <TopMenuBar />
@@ -57,6 +55,5 @@ export function StudioLayout() {
         <LeftPanelToggle />
       </div>
     </div>
-    </TerrainEditorProvider>
   );
 }

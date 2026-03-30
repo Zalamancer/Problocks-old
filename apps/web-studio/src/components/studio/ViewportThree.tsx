@@ -1,18 +1,8 @@
 import { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
-import { VoxelGrid } from '@problocks/engine/terrain/voxel/voxel-grid';
-import { ChunkMesher } from '@problocks/engine/terrain/meshing/chunk-mesher';
-import { ChunkManager } from '@problocks/engine/terrain/voxel/chunk-manager';
-import { TerrainGenerator } from '@problocks/engine/terrain/generation/terrain-generator';
-import { TerrainPhysics } from '@problocks/engine/terrain/physics/terrain-physics';
-import { ThreeChunkRenderer } from '@problocks/engine/terrain/rendering/three-chunk-renderer';
-import { ThreeGrassRenderer } from '@problocks/engine/terrain/rendering/three-grass-renderer';
-import type { TerrainRegion } from '@problocks/engine/terrain/generation/cave-generator';
-import { useStudio } from '@/store/studio-store';
 
-// ── Grass shaders (EXACT from codesandbox webgl-grass src/shaders.js) ──
+// ── Grass shaders (exact from codesandbox webgl-grass src/shaders.js) ──
 
 const grassVertexShader = /* glsl */ `
   uniform float uTime;
@@ -60,7 +50,7 @@ const grassFragmentShader = /* glsl */ `
   }
 `;
 
-// ── Grass blade generation (EXACT from codesandbox Grass.js) ────────
+// ── Grass blade generation (exact from codesandbox Grass.js) ────────
 
 const BLADE_WIDTH = 0.1;
 const BLADE_HEIGHT = 0.8;
@@ -136,7 +126,6 @@ function createGrassField(scene: THREE.Scene): THREE.ShaderMaterial {
   geom.setIndex(indices);
   geom.computeVertexNormals();
 
-  // Procedural cloud texture
   const cloudCanvas = document.createElement('canvas');
   cloudCanvas.width = 256;
   cloudCanvas.height = 256;
@@ -166,7 +155,6 @@ function createGrassField(scene: THREE.Scene): THREE.ShaderMaterial {
   const grassMesh = new THREE.Mesh(geom, material);
   scene.add(grassMesh);
 
-  // Floor
   const floor = new THREE.Mesh(
     new THREE.CircleGeometry(15, 8).rotateX(Math.PI / 2),
     material,
@@ -184,7 +172,6 @@ export function ViewportThree() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [fps, setFps] = useState(0);
   const [ready, setReady] = useState(false);
-  const { entities, isPlaying } = useStudio();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -192,114 +179,68 @@ export function ViewportThree() {
 
     let disposed = false;
 
-    async function init() {
-      if (!canvas || disposed) return;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
 
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0.53, 0.72, 0.9);
 
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0.53, 0.72, 0.9);
+    const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight);
+    camera.position.set(-7, 3, 7);
+    camera.lookAt(0, 0, 0);
 
-      // Camera — same as demo but pulled back a bit
-      const camera = new THREE.PerspectiveCamera(
-        75, canvas.clientWidth / canvas.clientHeight,
-      );
-      camera.position.set(-7, 3, 7);
-      camera.lookAt(0, 0, 0);
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.maxPolarAngle = Math.PI / 2.2;
+    controls.maxDistance = 15;
 
-      // Controls — same as demo
-      const controls = new OrbitControls(camera, canvas);
-      controls.enableDamping = true;
-      controls.enablePan = false;
-      controls.maxPolarAngle = Math.PI / 2.2;
-      controls.maxDistance = 15;
+    // Spawn the grass field
+    const grassMaterial = createGrassField(scene);
 
-      if (disposed) { renderer.dispose(); return; }
+    setReady(true);
 
-      // ── Spawn the exact grass field from the demo ───────────────
-      const grassMaterial = createGrassField(scene);
+    // Render loop
+    let frameCount = 0;
+    let fpsAccum = 0;
+    let lastTime = performance.now();
 
-      // ── Terrain (behind the grass) ──────────────────────────────
-      const terrainEntity = entities.find(e => e.type === 'terrain');
-      const t = terrainEntity?.terrain;
+    function animate(time: number) {
+      if (disposed) return;
 
-      const grid = new VoxelGrid();
-      const mesher = new ChunkMesher();
-      const chunkRenderer = new ThreeChunkRenderer(scene);
-      const chunkManager = new ChunkManager(grid, mesher, chunkRenderer as any);
-
-      const physics = new RapierPhysics();
-      await physics.init({ mode: '3d', gravity: { x: 0, y: -9.81, z: 0 } });
-      const terrainPhysics = new TerrainPhysics(physics.getWorld(), grid);
-      chunkManager.setTerrainPhysics(terrainPhysics);
-
-      if (t && t.mode === 'voxel') {
-        const region: TerrainRegion = {
-          minX: t.minX ?? -128, maxX: t.maxX ?? 128,
-          minY: t.minY ?? -32, maxY: t.maxY ?? 64,
-          minZ: t.minZ ?? -128, maxZ: t.maxZ ?? 128,
-        };
-        new TerrainGenerator().generate(grid, region, {
-          biomes: t.biomes ?? ['hills', 'plains'],
-          seed: t.seed,
-          biomeSize: t.biomeSize ?? 120,
-          blending: t.blending ?? 0.3,
-          caves: t.caves ?? true,
-        });
-        chunkManager.forceRemeshAll();
+      const now = performance.now();
+      frameCount++;
+      fpsAccum += now - lastTime;
+      lastTime = now;
+      if (fpsAccum >= 500) {
+        setFps(Math.round(frameCount / (fpsAccum / 1000)));
+        frameCount = 0;
+        fpsAccum = 0;
       }
 
-      if (disposed) { renderer.dispose(); physics.dispose(); return; }
-
-      // ── Render loop ─────────────────────────────────────────────
-      let frameCount = 0;
-      let fpsAccum = 0;
-      let lastTime = performance.now();
-
-      function animate(time: number) {
-        if (disposed) return;
-
-        const now = performance.now();
-        frameCount++;
-        fpsAccum += now - lastTime;
-        lastTime = now;
-        if (fpsAccum >= 500) {
-          setFps(Math.round(frameCount / (fpsAccum / 1000)));
-          frameCount = 0;
-          fpsAccum = 0;
-        }
-
-        controls.update();
-
-        // Grass wind — exact same as demo: material.uniforms.uTime.value = time
-        grassMaterial.uniforms.uTime.value = time;
-
-        // Terrain chunks
-        const cam = camera.position;
-        chunkManager.update({ x: cam.x, y: cam.y, z: cam.z });
-
-        renderer.render(scene, camera);
-        requestAnimationFrame(animate);
-      }
+      grassMaterial.uniforms.uTime.value = time;
+      controls.update();
+      renderer.render(scene, camera);
       requestAnimationFrame(animate);
-
-      const resizeObs = new ResizeObserver(() => {
-        if (!containerRef.current) return;
-        const w = containerRef.current.clientWidth;
-        const h = containerRef.current.clientHeight;
-        renderer.setSize(w, h);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      });
-      if (containerRef.current) resizeObs.observe(containerRef.current);
-
-      setReady(true);
     }
+    requestAnimationFrame(animate);
 
-    init().catch(err => console.error('[ViewportThree] init failed:', err));
-    return () => { disposed = true; };
+    const resizeObs = new ResizeObserver(() => {
+      if (!containerRef.current) return;
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    });
+    if (containerRef.current) resizeObs.observe(containerRef.current);
+
+    return () => {
+      disposed = true;
+      resizeObs.disconnect();
+      renderer.dispose();
+    };
   }, []);
 
   return (

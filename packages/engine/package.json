@@ -11,13 +11,7 @@
     "./renderer/*": "./src/renderer/*.ts",
     "./physics/*": "./src/physics/*.ts",
     "./core/*": "./src/core/*.ts",
-    "./scripting/*": "./src/scripting/*.ts",
-    "./terrain/*": "./src/terrain/*.ts",
-    "./terrain/voxel/*": "./src/terrain/voxel/*.ts",
-    "./terrain/meshing/*": "./src/terrain/meshing/*.ts",
-    "./terrain/rendering/*": "./src/terrain/rendering/*.ts",
-    "./terrain/generation/*": "./src/terrain/generation/*.ts",
-    "./terrain/physics/*": "./src/terrain/physics/*.ts"
+    "./scripting/*": "./src/scripting/*.ts"
   },
   "scripts": {
     "build": "tsc",
@@ -25,9 +19,6 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@babylonjs/core": "^9.0.0",
-    "@babylonjs/loaders": "^9.0.0",
-    "@babylonjs/materials": "^9.0.0",
     "@dimforge/rapier3d-compat": "^0.19.3",
     "@types/three": "^0.183.1",
     "quickjs-emscripten": "^0.31.0",
