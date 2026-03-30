@@ -4,6 +4,8 @@ import { createContext, useContext } from 'react';
  * Minimal studio state — shared between Explorer, Viewport, Properties.
  */
 export interface TerrainConfig {
+  mode?: 'heightmap' | 'voxel';
+  // Heightmap fields
   width: number;
   depth: number;
   subdivisions: number;
@@ -11,6 +13,17 @@ export interface TerrainConfig {
   seed: number;
   noiseScale: number;
   octaves: number;
+  // Voxel fields
+  minX?: number;
+  maxX?: number;
+  minY?: number;
+  maxY?: number;
+  minZ?: number;
+  maxZ?: number;
+  biomes?: string[];
+  biomeSize?: number;
+  blending?: number;
+  caves?: boolean;
 }
 
 export interface EntityData {
@@ -32,8 +45,8 @@ export interface EntityData {
   terrain?: TerrainConfig;
 }
 
-export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings';
-export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings';
+export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain';
+export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain';
 
 export interface StudioState {
   entities: EntityData[];

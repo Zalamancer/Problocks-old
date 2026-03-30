@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useStudio, type LeftPanelGroup, type LeftPanelTab } from '@/store/studio-store';
 import { ExplorerPanel } from './ExplorerPanel';
+import { TerrainEditorPanel } from './terrain-editor/TerrainEditorPanel';
 import type { LucideIcon } from 'lucide-react';
 
 // ── Tab group definitions ─────────────────────────────────────────────
@@ -65,6 +66,12 @@ const TAB_GROUPS: TabGroupDef[] = [
     label: 'Insert',
     icon: PlusCircle,
     subTabs: [{ id: 'insert', label: 'Insert Objects', icon: Box }],
+  },
+  {
+    id: 'terrain',
+    label: 'Terrain',
+    icon: Layers,
+    subTabs: [{ id: 'terrain', label: 'Terrain Editor', icon: Layers }],
   },
   {
     id: 'settings',
@@ -281,6 +288,52 @@ function MainGroupHeader() {
 
 // ── Panel content switcher ────────────────────────────────────────────
 
+function TerrainPanel() {
+  const { entities, updateEntity } = useStudio();
+  const terrainEntity = entities.find((e) => e.type === 'terrain');
+  const isVoxel = terrainEntity?.terrain?.mode === 'voxel';
+
+  const sim = (window as any).__problocks_sim as import('@problocks/engine/core/simulation-loop').SimulationLoop | undefined;
+
+  const handleGenerate = useCallback((config: {
+    biomes: string[]; seed: number; biomeSize: number; blending: number; caves: boolean;
+    minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
+  }) => {
+    if (!terrainEntity) return;
+    updateEntity(terrainEntity.id, {
+      terrain: {
+        ...terrainEntity.terrain!,
+        mode: 'voxel',
+        biomes: config.biomes,
+        seed: config.seed,
+        biomeSize: config.biomeSize,
+        blending: config.blending,
+        caves: config.caves,
+        minX: config.minX,
+        maxX: config.maxX,
+        minY: config.minY,
+        maxY: config.maxY,
+        minZ: config.minZ,
+        maxZ: config.maxZ,
+      },
+    });
+  }, [terrainEntity, updateEntity]);
+
+  if (!isVoxel) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Layers size={32} className="mx-auto text-zinc-600 mb-2" />
+          <p className="text-[13px] text-zinc-400">Terrain Editor</p>
+          <p className="text-[11px] text-zinc-600 mt-1">Switch terrain mode to Voxel in Properties to enable</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <TerrainEditorPanel onGenerate={handleGenerate} sim={sim ?? null} />;
+}
+
 function PanelContent({ group }: { group: LeftPanelGroup }) {
   switch (group) {
     case 'scene':
@@ -299,6 +352,8 @@ function PanelContent({ group }: { group: LeftPanelGroup }) {
       return <AssetsPanel />;
     case 'insert':
       return <InsertPanel />;
+    case 'terrain':
+      return <TerrainPanel />;
     case 'settings':
       return <SettingsPanel />;
     default:

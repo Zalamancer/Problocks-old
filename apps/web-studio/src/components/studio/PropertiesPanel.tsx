@@ -1,7 +1,52 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useStudio } from '@/store/studio-store';
 import { PanelSection, PanelSlider, PanelInput, PanelToggle, PanelColorSwatches } from '@/components/ui/panel-controls';
 import { getTerrainPresets, saveTerrainPreset, BUILT_IN_PRESETS } from '@/store/storage';
+import { getBiomeIds } from '@problocks/engine';
+import { cn } from '@/lib/utils';
+
+const BIOME_COLORS: Record<string, string> = {
+  arctic: '#C3C7DA', dunes: '#8F7E5F', canyons: '#895A47', lavascape: '#E89C4A',
+  water: '#0C545C', mountains: '#666C6F', hills: '#6A7F3F', plains: '#6A7F3F', marsh: '#3A2E24',
+};
+
+function VoxelBiomeSection({ entity, updateEntity }: {
+  entity: { id: string; terrain?: import('@/store/studio-store').TerrainConfig };
+  updateEntity: (id: string, partial: Partial<import('@/store/studio-store').EntityData>) => void;
+}) {
+  const biomeIds = useMemo(() => getBiomeIds(), []);
+  const selected = new Set(entity.terrain?.biomes ?? ['hills', 'plains']);
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    updateEntity(entity.id, { terrain: { ...entity.terrain!, biomes: Array.from(next) } });
+  };
+
+  return (
+    <PanelSection title="Biomes" collapsible>
+      <div className="grid grid-cols-3 gap-1">
+        {biomeIds.map((id) => {
+          const checked = selected.has(id);
+          return (
+            <button
+              key={id}
+              onClick={() => toggle(id)}
+              className={cn(
+                'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-left transition-colors text-[11px]',
+                checked ? 'bg-green-500/10 text-green-400' : 'text-zinc-400 hover:bg-white/[0.06]',
+              )}
+            >
+              <span className="shrink-0 w-2 h-2 rounded-full" style={{ backgroundColor: BIOME_COLORS[id] ?? '#888' }} />
+              {id}
+            </button>
+          );
+        })}
+      </div>
+    </PanelSection>
+  );
+}
 
 export function PropertiesPanel() {
   const { entities, selectedEntityId, updateEntity } = useStudio();
@@ -169,8 +214,38 @@ export function PropertiesPanel() {
               </PanelSection>
             )}
 
-            {/* Terrain */}
+            {/* Terrain Mode Toggle */}
             {entity.terrain && (
+              <PanelSection title="Terrain Mode" collapsible>
+                <div className="flex items-center gap-1 bg-[#2a2a2a] rounded-lg p-0.5">
+                  <button
+                    onClick={() => updateEntity(entity.id, { terrain: { ...entity.terrain!, mode: 'heightmap' } })}
+                    className={cn(
+                      'flex-1 text-[12px] py-1.5 rounded-md transition-colors',
+                      (entity.terrain.mode ?? 'heightmap') === 'heightmap'
+                        ? 'bg-zinc-600 text-zinc-100 font-medium'
+                        : 'text-zinc-400 hover:text-zinc-200',
+                    )}
+                  >
+                    Heightmap
+                  </button>
+                  <button
+                    onClick={() => updateEntity(entity.id, { terrain: { ...entity.terrain!, mode: 'voxel' } })}
+                    className={cn(
+                      'flex-1 text-[12px] py-1.5 rounded-md transition-colors',
+                      entity.terrain.mode === 'voxel'
+                        ? 'bg-green-600/80 text-white font-medium'
+                        : 'text-zinc-400 hover:text-zinc-200',
+                    )}
+                  >
+                    Voxel
+                  </button>
+                </div>
+              </PanelSection>
+            )}
+
+            {/* Heightmap Terrain */}
+            {entity.terrain && (entity.terrain.mode ?? 'heightmap') === 'heightmap' && (
               <>
                 <PanelSection title="Terrain" collapsible>
                   <PanelSlider
@@ -236,6 +311,97 @@ export function PropertiesPanel() {
                     Randomize Terrain
                   </button>
                 </PanelSection>
+              </>
+            )}
+
+            {/* Voxel Terrain */}
+            {entity.terrain && entity.terrain.mode === 'voxel' && (
+              <>
+                <PanelSection title="Region" collapsible>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-[11px] w-10 shrink-0">Min X</span>
+                      <PanelSlider label="" value={entity.terrain.minX ?? -128} onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, minX: v } })} min={-512} max={0} step={16} precision={0} inline className="flex-1" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-[11px] w-10 shrink-0">Max X</span>
+                      <PanelSlider label="" value={entity.terrain.maxX ?? 128} onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, maxX: v } })} min={0} max={512} step={16} precision={0} inline className="flex-1" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-[11px] w-10 shrink-0">Min Y</span>
+                      <PanelSlider label="" value={entity.terrain.minY ?? -32} onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, minY: v } })} min={-256} max={0} step={16} precision={0} inline className="flex-1" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-[11px] w-10 shrink-0">Max Y</span>
+                      <PanelSlider label="" value={entity.terrain.maxY ?? 64} onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, maxY: v } })} min={0} max={512} step={16} precision={0} inline className="flex-1" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-[11px] w-10 shrink-0">Min Z</span>
+                      <PanelSlider label="" value={entity.terrain.minZ ?? -128} onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, minZ: v } })} min={-512} max={0} step={16} precision={0} inline className="flex-1" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 text-[11px] w-10 shrink-0">Max Z</span>
+                      <PanelSlider label="" value={entity.terrain.maxZ ?? 128} onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, maxZ: v } })} min={0} max={512} step={16} precision={0} inline className="flex-1" />
+                    </div>
+                  </div>
+                </PanelSection>
+
+                <VoxelBiomeSection entity={entity} updateEntity={updateEntity} />
+
+                <PanelSection title="Settings" collapsible>
+                  <PanelSlider
+                    label="Biome Size"
+                    value={entity.terrain.biomeSize ?? 120}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, biomeSize: v } })}
+                    min={50}
+                    max={500}
+                    step={10}
+                    precision={0}
+                  />
+                  <PanelSlider
+                    label="Blending"
+                    value={entity.terrain.blending ?? 0.3}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, blending: v } })}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    precision={2}
+                  />
+                  <PanelToggle
+                    label="Caves"
+                    checked={entity.terrain.caves ?? true}
+                    onChange={(v) => updateEntity(entity.id, { terrain: { ...entity.terrain!, caves: v } })}
+                    description="Carve procedural caves"
+                  />
+                </PanelSection>
+
+                <PanelSection title="Seed" collapsible>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-400 text-sm w-16 shrink-0">Seed</span>
+                    <div className="flex-1 bg-[#2a2a2a] text-white text-sm px-3 py-2 rounded-lg">
+                      {entity.terrain.seed}
+                    </div>
+                  </div>
+                  <button
+                    className="mt-2 w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-colors"
+                    onClick={() => updateEntity(entity.id, {
+                      terrain: { ...entity.terrain!, seed: Math.floor(Math.random() * 100000) },
+                    })}
+                  >
+                    Randomize Seed
+                  </button>
+                </PanelSection>
+
+                <button
+                  className="w-full rounded-lg bg-green-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-green-500 transition-colors"
+                  onClick={() => {
+                    // Force terrain recreation by bumping seed then restoring
+                    const t = entity.terrain!;
+                    updateEntity(entity.id, { terrain: { ...t, seed: t.seed } });
+                  }}
+                >
+                  Generate Voxel Terrain
+                </button>
               </>
             )}
           </div>

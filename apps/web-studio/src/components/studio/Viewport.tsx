@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { BabylonRenderer } from '@problocks/engine/renderer/babylon-renderer';
 import { RapierPhysics } from '@problocks/engine/physics/rapier-physics';
 import { SimulationLoop } from '@problocks/engine/core/simulation-loop';
-import { TerrainComponent, WaterComponent } from '@problocks/engine/core/component';
+import { TerrainComponent, VoxelTerrainComponent, WaterComponent } from '@problocks/engine/core/component';
 import { useStudio, StudioContext } from '@/store/studio-store';
 
 /**
@@ -49,24 +49,41 @@ export function Viewport() {
       const terrainEntity = entities.find(e => e.type === 'terrain');
       const t = terrainEntity?.terrain;
       if (t) {
-        const terrain = new TerrainComponent();
-        terrain.width = t.width;
-        terrain.depth = t.depth;
-        terrain.subdivisions = t.subdivisions;
-        terrain.maxHeight = t.maxHeight;
-        terrain.seed = t.seed;
-        terrain.noiseScale = t.noiseScale;
-        terrain.octaves = t.octaves;
-        sim.createTerrain(terrain);
-        lastTerrainKeyRef.current = JSON.stringify(t);
+        if (t.mode === 'voxel') {
+          const vt = new VoxelTerrainComponent();
+          vt.enabled = true;
+          vt.minX = t.minX ?? -128;
+          vt.maxX = t.maxX ?? 128;
+          vt.minY = t.minY ?? -32;
+          vt.maxY = t.maxY ?? 64;
+          vt.minZ = t.minZ ?? -128;
+          vt.maxZ = t.maxZ ?? 128;
+          vt.biomes = t.biomes ?? ['hills', 'plains'];
+          vt.seed = t.seed;
+          vt.biomeSize = t.biomeSize ?? 120;
+          vt.blending = t.blending ?? 0.3;
+          vt.caves = t.caves ?? true;
+          sim.createVoxelTerrain(vt);
+        } else {
+          const terrain = new TerrainComponent();
+          terrain.width = t.width;
+          terrain.depth = t.depth;
+          terrain.subdivisions = t.subdivisions;
+          terrain.maxHeight = t.maxHeight;
+          terrain.seed = t.seed;
+          terrain.noiseScale = t.noiseScale;
+          terrain.octaves = t.octaves;
+          sim.createTerrain(terrain);
 
-        const water = new WaterComponent();
-        water.width = t.width;
-        water.depth = t.depth;
-        water.waterLevel = 2.5;
-        water.buoyancy = 9.8;
-        water.waterDrag = 0.8;
-        sim.createWater(water);
+          const water = new WaterComponent();
+          water.width = t.width;
+          water.depth = t.depth;
+          water.waterLevel = 2.5;
+          water.buoyancy = 9.8;
+          water.waterDrag = 0.8;
+          sim.createWater(water);
+        }
+        lastTerrainKeyRef.current = JSON.stringify(t);
       }
 
       // Create all entities from store
@@ -195,24 +212,46 @@ export function Viewport() {
     lastTerrainKeyRef.current = key;
 
     const t = terrainEntity.terrain;
-    const terrain = new TerrainComponent();
-    terrain.width = t.width;
-    terrain.depth = t.depth;
-    terrain.subdivisions = t.subdivisions;
-    terrain.maxHeight = t.maxHeight;
-    terrain.seed = t.seed;
-    terrain.noiseScale = t.noiseScale;
-    terrain.octaves = t.octaves;
-    engineRef.current.sim.createTerrain(terrain);
+    const sim = engineRef.current.sim;
 
-    // Recreate water to match terrain dimensions
-    const water = new WaterComponent();
-    water.width = t.width;
-    water.depth = t.depth;
-    water.waterLevel = 2.5;
-    water.buoyancy = 9.8;
-    water.waterDrag = 0.8;
-    engineRef.current.sim.createWater(water);
+    if (t.mode === 'voxel') {
+      sim.disposeVoxelTerrain();
+      const vt = new VoxelTerrainComponent();
+      vt.enabled = true;
+      vt.minX = t.minX ?? -128;
+      vt.maxX = t.maxX ?? 128;
+      vt.minY = t.minY ?? -32;
+      vt.maxY = t.maxY ?? 64;
+      vt.minZ = t.minZ ?? -128;
+      vt.maxZ = t.maxZ ?? 128;
+      vt.biomes = t.biomes ?? ['hills', 'plains'];
+      vt.seed = t.seed;
+      vt.biomeSize = t.biomeSize ?? 120;
+      vt.blending = t.blending ?? 0.3;
+      vt.caves = t.caves ?? true;
+      sim.createVoxelTerrain(vt);
+    } else {
+      // Dispose voxel terrain if switching back to heightmap
+      sim.disposeVoxelTerrain();
+
+      const terrain = new TerrainComponent();
+      terrain.width = t.width;
+      terrain.depth = t.depth;
+      terrain.subdivisions = t.subdivisions;
+      terrain.maxHeight = t.maxHeight;
+      terrain.seed = t.seed;
+      terrain.noiseScale = t.noiseScale;
+      terrain.octaves = t.octaves;
+      sim.createTerrain(terrain);
+
+      const water = new WaterComponent();
+      water.width = t.width;
+      water.depth = t.depth;
+      water.waterLevel = 2.5;
+      water.buoyancy = 9.8;
+      water.waterDrag = 0.8;
+      sim.createWater(water);
+    }
   }, [entities, ready]);
 
   // Sync selected entity transform from store → engine when properties change

@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { BiomeSettings } from './BiomeSettings';
 import { EditTab, defaultEditTabState } from './EditTab';
 import type { EditTabState } from './EditTab';
 import { HeightmapUploader, defaultHeightmapState } from './HeightmapUploader';
 import type { HeightmapUploaderState } from './HeightmapUploader';
+import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -71,7 +72,23 @@ function NumberField({
 
 // ── Main Panel ─────────────────────────────────────────────────────
 
-export function TerrainEditorPanel() {
+interface TerrainEditorPanelProps {
+  /** Called when user clicks Generate — parent updates the store to trigger Viewport recreation */
+  onGenerate?: (config: {
+    biomes: string[];
+    seed: number;
+    biomeSize: number;
+    blending: number;
+    caves: boolean;
+    minX: number; maxX: number;
+    minY: number; maxY: number;
+    minZ: number; maxZ: number;
+  }) => void;
+  /** SimulationLoop ref for wiring brush controller in Edit tab */
+  sim?: SimulationLoop | null;
+}
+
+export function TerrainEditorPanel({ onGenerate, sim }: TerrainEditorPanelProps = {}) {
   const [activeTab, setActiveTab] = useState<'create' | 'edit'>('create');
   const [createMode, setCreateMode] = useState<'generate' | 'import'>('generate');
 
@@ -126,12 +143,26 @@ export function TerrainEditorPanel() {
 
   const handleGenerate = useCallback(() => {
     const biomes = Array.from(selectedBiomes);
-    console.log('Generate terrain', { biomes, settings, region });
+
+    if (onGenerate) {
+      onGenerate({
+        biomes,
+        seed: settings.seed,
+        biomeSize: settings.biomeSize,
+        blending: settings.blending,
+        caves: settings.caves,
+        minX: region.posX - region.sizeX / 2,
+        maxX: region.posX + region.sizeX / 2,
+        minY: region.posY,
+        maxY: region.posY + region.sizeY,
+        minZ: region.posZ - region.sizeZ / 2,
+        maxZ: region.posZ + region.sizeZ / 2,
+      });
+    }
 
     setGenerating(true);
     setProgress(0);
 
-    // Simulate progress for UI demonstration
     let p = 0;
     const interval = setInterval(() => {
       p += 0.05 + Math.random() * 0.1;
@@ -145,7 +176,7 @@ export function TerrainEditorPanel() {
       }
       setProgress(p);
     }, 120);
-  }, [selectedBiomes, settings, region]);
+  }, [selectedBiomes, settings, region, onGenerate]);
 
   const randomizeSeed = useCallback(() => {
     updateSetting('seed', Math.floor(Math.random() * 100000));
