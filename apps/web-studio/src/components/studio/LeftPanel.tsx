@@ -23,7 +23,6 @@ import {
 import { cn } from '@/lib/utils';
 import { useStudio, type LeftPanelGroup, type LeftPanelTab } from '@/store/studio-store';
 import { ExplorerPanel } from './ExplorerPanel';
-import { TerrainEditorPanel } from './terrain-editor/TerrainEditorPanel';
 import type { LucideIcon } from 'lucide-react';
 
 // ── Tab group definitions ─────────────────────────────────────────────
@@ -289,49 +288,15 @@ function MainGroupHeader() {
 // ── Panel content switcher ────────────────────────────────────────────
 
 function TerrainPanel() {
-  const { entities, updateEntity } = useStudio();
-  const terrainEntity = entities.find((e) => e.type === 'terrain');
-  const isVoxel = terrainEntity?.terrain?.mode === 'voxel';
-
-  const sim = (window as any).__problocks_sim as import('@problocks/engine/core/simulation-loop').SimulationLoop | undefined;
-
-  const handleGenerate = useCallback((config: {
-    biomes: string[]; seed: number; biomeSize: number; blending: number; caves: boolean;
-    minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
-  }) => {
-    if (!terrainEntity) return;
-    updateEntity(terrainEntity.id, {
-      terrain: {
-        ...terrainEntity.terrain!,
-        mode: 'voxel',
-        biomes: config.biomes,
-        seed: config.seed,
-        biomeSize: config.biomeSize,
-        blending: config.blending,
-        caves: config.caves,
-        minX: config.minX,
-        maxX: config.maxX,
-        minY: config.minY,
-        maxY: config.maxY,
-        minZ: config.minZ,
-        maxZ: config.maxZ,
-      },
-    });
-  }, [terrainEntity, updateEntity]);
-
-  if (!isVoxel) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Layers size={32} className="mx-auto text-zinc-600 mb-2" />
-          <p className="text-[13px] text-zinc-400">Terrain Editor</p>
-          <p className="text-[11px] text-zinc-600 mt-1">Switch terrain mode to Voxel in Properties to enable</p>
-        </div>
+  return (
+    <div className="flex-1 flex items-center justify-center p-4">
+      <div className="text-center">
+        <Layers size={32} className="mx-auto text-zinc-600 mb-2" />
+        <p className="text-[13px] text-zinc-400">Terrain Editor</p>
+        <p className="text-[11px] text-zinc-600 mt-1">Coming soon</p>
       </div>
-    );
-  }
-
-  return <TerrainEditorPanel onGenerate={handleGenerate} sim={sim ?? null} />;
+    </div>
+  );
 }
 
 function PanelContent({ group }: { group: LeftPanelGroup }) {
