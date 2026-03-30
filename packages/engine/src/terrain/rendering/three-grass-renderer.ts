@@ -1,11 +1,9 @@
 /**
- * Three.js Grass Renderer
+ * Three.js Grass Renderer — exact replica of
+ * https://codesandbox.io/p/sandbox/webgl-grass-3rk1o6
  *
- * Exact code from https://codesandbox.io/p/sandbox/webgl-grass-3rk1o6
- * adapted for per-chunk terrain. Blade vertex Y positions are stored
- * relative to blade base (0 = base, ~1.4 = tip) so vPosition.y works
- * exactly like the demo. A separate baseY attribute offsets blades to
- * the terrain surface for rendering.
+ * ONLY change from the demo: blade base Y is offset to terrain
+ * surface via `baseY` attribute. Everything else is untouched.
  */
 
 import * as THREE from "three";
@@ -14,9 +12,8 @@ import { CHUNK_SIZE, VOXEL_SIZE, MC_THRESHOLD } from "../voxel/constants.js";
 import { TerrainMaterial } from "../voxel/terrain-materials.js";
 import { voxelIndex } from "../voxel/voxel.js";
 
-// ── Shaders ─────────────────────────────────────────────────────────
-// Identical to demo except: added `baseY` attribute so blade positions
-// can be relative to y=0 (for gradient) while rendering on terrain.
+// ── Shaders (from src/shaders.js) ───────────────────────────────────
+// ONLY addition: `attribute float baseY` and `finalPos.y += baseY`
 
 const vertexShader = /* glsl */ `
   uniform float uTime;
@@ -33,24 +30,24 @@ const vertexShader = /* glsl */ `
   }
 
   void main() {
-    vPosition = position;  // y is 0 at base, ~1.4 at tip — SAME as demo
+    vPosition = position;
     vUv = uv;
     vNormal = normalize(normalMatrix * normal);
 
-    vec3 finalPos = position;
-    finalPos.y += baseY;  // offset to terrain surface for rendering
-
-    if (position.y < 0.0) {
-      finalPos.y = baseY;
+    if (vPosition.y < 0.0) {
+      vPosition.y = 0.0;
     } else {
-      finalPos.x += wave(uv.x * 10.0, 0.3, 0.1);
+      vPosition.x += wave(uv.x * 10.0, 0.3, 0.1);
     }
 
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(finalPos, 1.0);
+    // ONLY terrain addition: offset Y to terrain surface
+    vec3 renderPos = vPosition;
+    renderPos.y += baseY;
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(renderPos, 1.0);
   }
 `;
 
-// Fragment shader — EXACT copy from demo, unchanged
 const fragmentShader = /* glsl */ `
   uniform sampler2D uCloud;
 
@@ -69,25 +66,17 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
-// ── Parameters (from Grass.js) ──────────────────────────────────────
+// ── Parameters (EXACT from Grass.js — NO scaling) ───────────────────
 
 const BLADE_WIDTH = 0.1;
 const BLADE_HEIGHT = 0.8;
 const BLADE_HEIGHT_VARIATION = 0.6;
 const BLADE_VERTEX_COUNT = 5;
 const BLADE_TIP_OFFSET = 0.1;
-const BLADES_PER_VOXEL = 24;
-const SCALE = 2.0;
+const BLADES_PER_VOXEL = 60; // ~100k blades / ~1600 surface voxels
 
 function interpolate(val: number, oldMin: number, oldMax: number, newMin: number, newMax: number) {
   return ((val - oldMin) * (newMax - newMin)) / (oldMax - oldMin) + newMin;
-}
-
-function hash(x: number, y: number, z: number, seed: number): number {
-  let h = (seed + x * 374761393 + y * 668265263 + z * 1274126177) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h = h ^ (h >>> 16);
-  return (h & 0x7fffffff) / 0x7fffffff;
 }
 
 const GRASS_MATERIALS = new Set<number>([
@@ -108,7 +97,7 @@ export class ThreeGrassRenderer {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    // Procedural cloud texture (same as standalone demo)
+    // Procedural cloud texture (same as GrassDemo.tsx)
     const cloudCanvas = document.createElement("canvas");
     cloudCanvas.width = 256;
     cloudCanvas.height = 256;
@@ -125,6 +114,7 @@ export class ThreeGrassRenderer {
     const cloudTexture = new THREE.CanvasTexture(cloudCanvas);
     cloudTexture.wrapS = cloudTexture.wrapT = THREE.RepeatWrapping;
 
+    // Exact same ShaderMaterial as demo
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         uCloud: { value: cloudTexture },
@@ -141,8 +131,8 @@ export class ThreeGrassRenderer {
   }
 
   // ── Per-chunk blade generation ─────────────────────────────────
-  // computeBlade() logic from Grass.js, but blade Y starts at 0
-  // and baseY stores the terrain surface offset.
+  // Exact computeBlade() from Grass.js + Math.random()
+  // ONLY terrain addition: baseY attribute for surface offset
 
   updateChunk(chunkKey: string, chunk: Chunk): void {
     if (!this.decoration) {
@@ -152,12 +142,14 @@ export class ThreeGrassRenderer {
 
     const occ = chunk.data.occupancy;
     const mat = chunk.data.materials;
+    const chunkOriginX = chunk.worldOrigin.x;
+    const chunkOriginZ = chunk.worldOrigin.z;
 
     const positions: number[] = [];
     const baseYs: number[] = [];
     const uvs: number[] = [];
     const indices: number[] = [];
-    let vtx = 0;
+    let bladeIndex = 0;
 
     for (let z = 0; z < CHUNK_SIZE; z++) {
       for (let y = 0; y < CHUNK_SIZE - 1; y++) {
@@ -175,74 +167,71 @@ export class ThreeGrassRenderer {
           const t = denom === 0 ? 0.5 : (MC_THRESHOLD - occBelow) / denom;
           const surfaceY = (y + t) * VOXEL_SIZE;
 
-          const chunkOriginX = chunk.worldOrigin.x;
-          const chunkOriginZ = chunk.worldOrigin.z;
-
           for (let b = 0; b < BLADES_PER_VOXEL; b++) {
-            const seed = b * 7 + 13;
-            const offX = hash(x, z, b, seed) * VOXEL_SIZE;
-            const offZ = hash(z, x, b, seed + 37) * VOXEL_SIZE;
+            // Random position within voxel (Math.random like demo)
+            const rx = Math.random() * VOXEL_SIZE;
+            const rz = Math.random() * VOXEL_SIZE;
+            const cx = x * VOXEL_SIZE + rx;
+            const cz = z * VOXEL_SIZE + rz;
 
-            const cx = x * VOXEL_SIZE + offX;
-            const cz = z * VOXEL_SIZE + offZ;
-
+            // UV — same interpolate() as demo
             const wx = chunkOriginX + cx;
             const wz = chunkOriginZ + cz;
-            const u = interpolate(wx, -128, 128, 0, 1);
-            const v2 = interpolate(wz, -128, 128, 0, 1);
+            const surfaceMin = -128;
+            const surfaceMax = 128;
+            const bladeUv: [number, number] = [
+              interpolate(wx, surfaceMin, surfaceMax, 0, 1),
+              interpolate(wz, surfaceMin, surfaceMax, 0, 1),
+            ];
 
-            // Exact computeBlade() from Grass.js
-            const height = (BLADE_HEIGHT + hash(x, y, z + b, seed + 99) * BLADE_HEIGHT_VARIATION) * SCALE;
+            // ── Exact computeBlade() from Grass.js ──────────────
+            const height = BLADE_HEIGHT + Math.random() * BLADE_HEIGHT_VARIATION;
+            const vIndex = bladeIndex * BLADE_VERTEX_COUNT;
 
-            const yaw = hash(x, y, z + b, seed + 71) * Math.PI * 2;
+            const yaw = Math.random() * Math.PI * 2;
             const yawVec = [Math.sin(yaw), 0, -Math.cos(yaw)];
-            const bend = hash(x + b, y, z, seed + 53) * Math.PI * 2;
+            const bend = Math.random() * Math.PI * 2;
             const bendVec = [Math.sin(bend), 0, -Math.cos(bend)];
 
-            const w2 = (BLADE_WIDTH * SCALE) / 2;
-            const w4 = (BLADE_WIDTH * SCALE) / 4;
-            const tipOff = BLADE_TIP_OFFSET * SCALE;
+            const center = [cx, 0, cz];
 
-            // Blade positions with Y relative to base (0 = ground)
-            // This makes vPosition.y work exactly like the demo
+            const bl = yawVec.map((n, i) => n * (BLADE_WIDTH / 2) * 1 + center[i]);
+            const br = yawVec.map((n, i) => n * (BLADE_WIDTH / 2) * -1 + center[i]);
+            const tl = yawVec.map((n, i) => n * (BLADE_WIDTH / 4) * 1 + center[i]);
+            const tr = yawVec.map((n, i) => n * (BLADE_WIDTH / 4) * -1 + center[i]);
+            const tc = bendVec.map((n, i) => n * BLADE_TIP_OFFSET + center[i]);
 
-            // bl (base left) — y=0
-            positions.push(cx + yawVec[0] * w2, 0, cz + yawVec[2] * w2);
-            baseYs.push(surfaceY);
-            uvs.push(u, v2);
+            tl[1] += height / 2;
+            tr[1] += height / 2;
+            tc[1] += height;
 
-            // br (base right) — y=0
-            positions.push(cx - yawVec[0] * w2, 0, cz - yawVec[2] * w2);
-            baseYs.push(surfaceY);
-            uvs.push(u, v2);
+            // Push positions (y=0 at base, same as demo)
+            positions.push(...bl, ...br, ...tr, ...tl, ...tc);
 
-            // tr (mid right) — y=height/2
-            positions.push(cx - yawVec[0] * w4, height / 2, cz - yawVec[2] * w4);
-            baseYs.push(surfaceY);
-            uvs.push(u, v2);
+            // baseY for all 5 verts (terrain surface offset)
+            for (let v = 0; v < BLADE_VERTEX_COUNT; v++) {
+              baseYs.push(surfaceY);
+            }
 
-            // tl (mid left) — y=height/2
-            positions.push(cx + yawVec[0] * w4, height / 2, cz + yawVec[2] * w4);
-            baseYs.push(surfaceY);
-            uvs.push(u, v2);
+            // UV for all 5 verts (same UV per blade, like demo)
+            for (let v = 0; v < BLADE_VERTEX_COUNT; v++) {
+              uvs.push(bladeUv[0], bladeUv[1]);
+            }
 
-            // tc (tip) — y=height
-            positions.push(cx + bendVec[0] * tipOff, height, cz + bendVec[2] * tipOff);
-            baseYs.push(surfaceY);
-            uvs.push(u, v2);
+            // Indices — exact from demo
+            indices.push(
+              vIndex, vIndex + 1, vIndex + 2,
+              vIndex + 2, vIndex + 4, vIndex + 3,
+              vIndex + 3, vIndex, vIndex + 2,
+            );
 
-            // Exact indices from demo
-            indices.push(vtx, vtx + 1, vtx + 2);
-            indices.push(vtx + 2, vtx + 4, vtx + 3);
-            indices.push(vtx + 3, vtx, vtx + 2);
-
-            vtx += BLADE_VERTEX_COUNT;
+            bladeIndex++;
           }
         }
       }
     }
 
-    if (vtx === 0) {
+    if (bladeIndex === 0) {
       this.disposeChunk(chunkKey);
       return;
     }
