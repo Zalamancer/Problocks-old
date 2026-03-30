@@ -71,7 +71,7 @@ export class ChunkManager {
   private pendingWorkerChunks = new Set<string>();
 
   /** Max chunks to remesh per frame (auto-adjusted by perf tracker). */
-  meshBudgetPerFrame = 4;
+  meshBudgetPerFrame = 8;
 
   /** Profiling: chunks meshed in the last update() call */
   lastMeshedCount = 0;

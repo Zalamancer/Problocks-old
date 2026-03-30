@@ -29,9 +29,9 @@ export const LOD_GRID_SIZE = [16, 8, 4, 2] as const;
 
 /** Squared distance thresholds (world units²) for LOD selection. */
 export const LOD_DISTANCE_SQ = [
-  128 * 128,   // Full  < 128
-  256 * 256,   // Half  < 256
-  512 * 512,   // Quarter < 512
+  320 * 320,   // Full  < 320 (match LOAD_DISTANCE — all loaded chunks use seamless meshing)
+  450 * 450,   // Half  < 450
+  700 * 700,   // Quarter < 700
   Infinity,    // Eighth  beyond
 ] as const;
 
