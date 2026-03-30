@@ -50,7 +50,15 @@ export class ChunkRenderer {
   private readonly MAX_POOL_SIZE = 64;
 
   /** Enable triplanar texturing for solid terrain (Phase 9.4). */
-  useTriplanar: boolean = false;
+  useTriplanar: boolean = true;
+
+  /** Texture paths for triplanar material. */
+  triplanarTextures: import("./triplanar-material.js").TriplanarTextureOptions = {
+    colorPath: "/textures/Grass005_1K-JPG_Color.jpg",
+    normalPath: "/textures/Grass005_1K-JPG_NormalGL.jpg",
+    roughnessPath: "/textures/Grass005_1K-JPG_Roughness.jpg",
+    aoPath: "/textures/Grass005_1K-JPG_AmbientOcclusion.jpg",
+  };
 
   /** Replace the water material and update all existing water meshes. */
   setWaterMaterial(mat: BABYLON.Material): void {
@@ -306,7 +314,13 @@ export class ChunkRenderer {
   /** Lazily create the triplanar ShaderMaterial. */
   private getTriplanarMaterial(): BABYLON.ShaderMaterial {
     if (!this.triplanarMat) {
-      this.triplanarMat = createTriplanarMaterial(this.scene);
+      this.triplanarMat = createTriplanarMaterial(
+        this.scene,
+        "terrain_triplanar_mat",
+        0.08,
+        0.6,
+        this.triplanarTextures,
+      );
     }
     return this.triplanarMat;
   }
