@@ -99,20 +99,24 @@ export class TerrainGenerator {
         }
 
         // iv) For each wy from region.minY to region.maxY
+        //     Use a wide gradient (3 voxels) so Marching Cubes produces
+        //     smooth, rounded surfaces instead of flat/angular ones.
+        const GRADIENT_HALF = VOXEL_SIZE * 1.5; // 1.5 voxels of smooth falloff
         for (let wy = region.minY; wy < region.maxY; wy += VOXEL_SIZE) {
-          // Above surface = air
-          if (wy > surfaceY + VOXEL_SIZE) continue;
+          // Well above surface = air
+          if (wy > surfaceY + GRADIENT_HALF) continue;
 
-          // Compute occupancy
+          // Compute occupancy with wide gradient
+          const dist = surfaceY - wy; // positive = below surface, negative = above
           let occupancy: number;
-          if (wy < surfaceY - VOXEL_SIZE) {
-            occupancy = 1.0; // fully solid
+          if (dist >= GRADIENT_HALF) {
+            occupancy = 1.0; // deep underground — fully solid
+          } else if (dist <= -GRADIENT_HALF) {
+            occupancy = 0.0; // well above surface — air
           } else {
-            occupancy = clamp(
-              (surfaceY - wy) / VOXEL_SIZE + 0.5,
-              0,
-              1,
-            ); // gradient at surface
+            // Smooth hermite interpolation across the gradient band
+            const t = (dist + GRADIENT_HALF) / (GRADIENT_HALF * 2); // 0 (above) to 1 (below)
+            occupancy = t * t * (3 - 2 * t); // smoothstep
           }
 
           if (occupancy <= 0) continue;
