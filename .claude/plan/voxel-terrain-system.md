@@ -585,28 +585,28 @@ Replace the current heightmap-based terrain (`TerrainComponent` + `noise.ts` + `
 ### 9.1 Animated Grass
 **File**: `packages/engine/src/terrain/rendering/grass-renderer.ts`
 
-- [ ] Scan chunk mesh for upward-facing surfaces with Grass/LeafyGrass material
-- [ ] Generate instanced grass blade geometry (thin triangles)
-- [ ] Vertex shader: bend blades using `sin(worldPos.x + time * windSpeed)` for wind
-- [ ] `decoration: boolean` toggle — enable/disable grass rendering
-- [ ] `grassLength: number` (0.1–1.0) — scales blade height
-- [ ] Only render on visible chunks (frustum cull)
+- [x] Scan chunk mesh for upward-facing surfaces with Grass/LeafyGrass material
+- [x] Generate instanced grass blade geometry (thin triangles)
+- [x] Vertex shader: bend blades using `sin(worldPos.x + time * windSpeed)` for wind
+- [x] `decoration: boolean` toggle — enable/disable grass rendering
+- [x] `grassLength: number` (0.1–1.0) — scales blade height
+- [x] Only render on visible chunks (frustum cull)
 
 ### 9.2 Emissive Materials
-- [ ] Cracked Lava: add emissive color `(232, 156, 74)` to material shader
-- [ ] Emissive intensity modulation for pulsing glow effect
+- [x] Cracked Lava: add emissive color `(232, 156, 74)` to material shader
+- [x] Emissive intensity modulation for pulsing glow effect
 
 ### 9.3 Custom Terrain Colors
-- [ ] `materialColorOverrides: Map<TerrainMaterial, [r,g,b]>` on terrain config
-- [ ] UI: color picker per material in Properties panel
-- [ ] Presets: Default, Fantasy (purple grass, orange rock), Tundra (blue-gray everything)
-- [ ] Apply overrides during chunk meshing (override vertex colors)
+- [x] `materialColorOverrides: Map<TerrainMaterial, [r,g,b]>` on terrain config
+- [x] UI: color picker per material in Properties panel
+- [x] Presets: Default, Fantasy (purple grass, orange rock), Tundra (blue-gray everything)
+- [x] Apply overrides during chunk meshing (override vertex colors)
 
 ### 9.4 Triplanar Texturing (Optional)
-- [ ] Create texture atlas (512x512 per material, packed into Texture2DArray)
-- [ ] Custom `ShaderMaterial` with triplanar projection
-- [ ] Per-vertex material ID attributes for texture array lookup
-- [ ] Blend between materials at voxel boundaries
+- [x] Create texture atlas (512x512 per material, packed into Texture2DArray)
+- [x] Custom `ShaderMaterial` with triplanar projection
+- [x] Per-vertex material ID attributes for texture array lookup
+- [x] Blend between materials at voxel boundaries
 
 **MILESTONE**: Grass sways in wind, lava glows, custom color themes work.
 

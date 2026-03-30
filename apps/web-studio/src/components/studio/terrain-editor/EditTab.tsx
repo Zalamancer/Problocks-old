@@ -12,7 +12,7 @@ import { MaterialPicker } from './MaterialPicker';
 // ── Types ──────────────────────────────────────────────────────────
 
 export type BrushTool = 'draw' | 'sculpt' | 'smooth' | 'flatten' | 'paint'
-  | 'select' | 'transform' | 'fill' | 'sealevel' | 'water';
+  | 'select' | 'transform' | 'fill' | 'sealevel' | 'water' | 'colors';
 export type BrushShapeUI = 'sphere' | 'box' | 'cylinder';
 export type FlattenModeUI = 'both' | 'erode' | 'grow';
 export type PaintModeUI = 'paint' | 'replace';
@@ -55,6 +55,10 @@ export interface EditTabState {
   waterTransparency: number;
   waterWaveSize: number;
   waterWaveSpeed: number;
+  // Visual polish (Phase 9)
+  decoration: boolean;
+  grassLength: number;
+  colorPreset: string;
 }
 
 // ── Section header (reused) ────────────────────────────────────────
@@ -121,6 +125,7 @@ const REGION_TOOLS: { id: BrushTool; label: string; icon: string }[] = [
   { id: 'fill',      label: 'Fill',      icon: '▮' },
   { id: 'sealevel',  label: 'Sea Level', icon: '≋' },
   { id: 'water',     label: 'Water',     icon: '~' },
+  { id: 'colors',    label: 'Colors',    icon: '◐' },
 ];
 
 const SHAPES: { id: BrushShapeUI; label: string }[] = [
@@ -599,6 +604,45 @@ export function EditTab({ state, onChange }: EditTabProps) {
         </div>
       )}
 
+      {/* ── Colors / Decoration (Phase 9) ──────────── */}
+      {state.tool === 'colors' && (
+        <div className="space-y-3">
+          <div>
+            <SectionHeader>Grass</SectionHeader>
+            <div className="space-y-2">
+              <Checkbox
+                checked={state.decoration}
+                onChange={(v) => update('decoration', v)}
+                label="Show Grass"
+              />
+              {state.decoration && (
+                <Slider
+                  label="Grass Length"
+                  value={state.grassLength}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  displayValue={state.grassLength.toFixed(2)}
+                  onChange={(v) => update('grassLength', v)}
+                />
+              )}
+            </div>
+          </div>
+          <div>
+            <SectionHeader>Color Preset</SectionHeader>
+            <ToggleGroup
+              options={[
+                { id: 'default', label: 'Default' },
+                { id: 'fantasy', label: 'Fantasy' },
+                { id: 'tundra', label: 'Tundra' },
+              ]}
+              value={state.colorPreset}
+              onChange={(v) => update('colorPreset', v)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── Water Properties tool (Phase 7) ─────────── */}
       {state.tool === 'water' && (
         <div className="space-y-3">
@@ -709,5 +753,9 @@ export function defaultEditTabState(): EditTabState {
     waterTransparency: 0.5,
     waterWaveSize: 0.3,
     waterWaveSpeed: 15,
+    // Visual polish (Phase 9)
+    decoration: true,
+    grassLength: 0.5,
+    colorPreset: 'default',
   };
 }

@@ -6,8 +6,8 @@
 export { VOXEL_SIZE, CHUNK_SIZE, CHUNK_VOLUME, CHUNK_WORLD_SIZE, MC_THRESHOLD } from './voxel/constants.js';
 
 // Core data types
-export { TerrainMaterial, MATERIAL_DEFS, MATERIAL_COUNT, materialNameToEnum, materialEnumToName } from './voxel/terrain-materials.js';
-export type { TerrainMaterialDef } from './voxel/terrain-materials.js';
+export { TerrainMaterial, MATERIAL_DEFS, MATERIAL_COUNT, materialNameToEnum, materialEnumToName, TERRAIN_COLOR_PRESETS } from './voxel/terrain-materials.js';
+export type { TerrainMaterialDef, ColorOverrideMap, TerrainColorPreset } from './voxel/terrain-materials.js';
 export { ChunkData, voxelIndex, indexToCoords } from './voxel/voxel.js';
 export type { Voxel } from './voxel/voxel.js';
 export { Chunk } from './voxel/chunk.js';
@@ -22,6 +22,8 @@ export type { ChunkMeshResult } from './meshing/chunk-mesher.js';
 
 // Rendering
 export { ChunkRenderer } from './rendering/chunk-renderer.js';
+export { GrassRenderer } from './rendering/grass-renderer.js';
+export { createTriplanarMaterial } from './rendering/triplanar-material.js';
 export { WaterVoxelRenderer, defaultWaterProperties } from './rendering/water-voxel-renderer.js';
 export type { WaterProperties } from './rendering/water-voxel-renderer.js';
 
