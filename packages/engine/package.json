@@ -11,7 +11,13 @@
     "./renderer/*": "./src/renderer/*.ts",
     "./physics/*": "./src/physics/*.ts",
     "./core/*": "./src/core/*.ts",
-    "./scripting/*": "./src/scripting/*.ts"
+    "./scripting/*": "./src/scripting/*.ts",
+    "./terrain/*": "./src/terrain/*.ts",
+    "./terrain/voxel/*": "./src/terrain/voxel/*.ts",
+    "./terrain/meshing/*": "./src/terrain/meshing/*.ts",
+    "./terrain/rendering/*": "./src/terrain/rendering/*.ts",
+    "./terrain/generation/*": "./src/terrain/generation/*.ts",
+    "./terrain/physics/*": "./src/terrain/physics/*.ts"
   },
   "scripts": {
     "build": "tsc",
