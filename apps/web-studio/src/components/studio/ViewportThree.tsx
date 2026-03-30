@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { useStudio } from '@/store/studio-store';
 import { ScalarField, generateMesh } from './MarchingCubes';
 import { sculptState } from './sculpt-state';
@@ -172,110 +173,132 @@ function tangentFrame(nx: number, ny: number, nz: number): { t: [number,number,n
   return { t, b: [b0, b1, b2] };
 }
 
-/** Scatter grass blades on a mesh's triangles. Returns grass geometry. */
-function scatterGrassOnMesh(terrainGeo: THREE.BufferGeometry, count: number): THREE.BufferGeometry {
-  const tPos = terrainGeo.attributes.position.array as Float32Array;
-  const triCount = tPos.length / 9; // non-indexed, 3 verts per tri, 3 floats per vert
-  if (triCount === 0) return new THREE.BufferGeometry();
+const MAX_BLADES = 500000;
+const TRIS_PER_BLADE = 3;
+const INDICES_PER_BLADE = TRIS_PER_BLADE * 3; // 9
 
-  // Compute triangle areas for weighted sampling
-  const areas = new Float32Array(triCount);
-  let totalArea = 0;
-  for (let i = 0; i < triCount; i++) {
-    const o = i * 9;
-    const ax = tPos[o+3]-tPos[o], ay = tPos[o+4]-tPos[o+1], az = tPos[o+5]-tPos[o+2];
-    const bx = tPos[o+6]-tPos[o], by = tPos[o+7]-tPos[o+1], bz = tPos[o+8]-tPos[o+2];
-    const cx = ay*bz - az*by, cy = az*bx - ax*bz, cz = ax*by - ay*bx;
-    areas[i] = Math.sqrt(cx*cx + cy*cy + cz*cz) * 0.5;
-    totalArea += areas[i];
-  }
+/** Pre-allocated grass buffer system — reuses GPU buffers, no alloc during sculpt */
+class GrassBuffer {
+  readonly geo: THREE.BufferGeometry;
+  private posArr: Float32Array;
+  private nrmArr: Float32Array;
+  private uvArr: Float32Array;
+  private idxArr: Uint32Array;
+  bladeCount = 0;
 
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
+  constructor() {
+    const maxVerts = MAX_BLADES * VERTS_PER_BLADE;
+    this.posArr = new Float32Array(maxVerts * 3);
+    this.nrmArr = new Float32Array(maxVerts * 3);
+    this.uvArr = new Float32Array(maxVerts * 2);
+    this.idxArr = new Uint32Array(MAX_BLADES * INDICES_PER_BLADE);
 
-  for (let blade = 0; blade < count; blade++) {
-    // Pick a triangle weighted by area
-    let r = Math.random() * totalArea;
-    let tri = 0;
-    for (let i = 0; i < triCount; i++) {
-      r -= areas[i];
-      if (r <= 0) { tri = i; break; }
+    // Pre-build index buffer (never changes, just pattern repeats)
+    for (let b = 0; b < MAX_BLADES; b++) {
+      const vi = b * VERTS_PER_BLADE;
+      const ii = b * INDICES_PER_BLADE;
+      this.idxArr[ii]   = vi;   this.idxArr[ii+1] = vi+1; this.idxArr[ii+2] = vi+2;
+      this.idxArr[ii+3] = vi+2; this.idxArr[ii+4] = vi+4; this.idxArr[ii+5] = vi+3;
+      this.idxArr[ii+6] = vi+3; this.idxArr[ii+7] = vi;   this.idxArr[ii+8] = vi+2;
     }
 
-    const o = tri * 9;
-    // Random point on triangle (barycentric)
-    let u = Math.random(), v = Math.random();
-    if (u + v > 1) { u = 1 - u; v = 1 - v; }
-    const w = 1 - u - v;
-    const px = tPos[o]*w + tPos[o+3]*u + tPos[o+6]*v;
-    const py = tPos[o+1]*w + tPos[o+4]*u + tPos[o+7]*v;
-    const pz = tPos[o+2]*w + tPos[o+5]*u + tPos[o+8]*v;
-
-    // Face normal
-    const ax = tPos[o+3]-tPos[o], ay = tPos[o+4]-tPos[o+1], az = tPos[o+5]-tPos[o+2];
-    const bx = tPos[o+6]-tPos[o], by = tPos[o+7]-tPos[o+1], bz = tPos[o+8]-tPos[o+2];
-    let nx = ay*bz - az*by, ny = az*bx - ax*bz, nz = ax*by - ay*bx;
-    const nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
-    nx /= nl; ny /= nl; nz /= nl;
-
-    // Tangent frame
-    const { t, b } = tangentFrame(nx, ny, nz);
-
-    const height = BLADE_HEIGHT + Math.random() * BLADE_HEIGHT_VARIATION;
-    const yaw = Math.random() * Math.PI * 2;
-    const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
-    const seed = Math.random();
-
-    // Local directions in tangent plane
-    const widthX = (t[0]*cosY + b[0]*sinY) * BLADE_WIDTH * 0.5;
-    const widthY = (t[1]*cosY + b[1]*sinY) * BLADE_WIDTH * 0.5;
-    const widthZ = (t[2]*cosY + b[2]*sinY) * BLADE_WIDTH * 0.5;
-
-    const vi = blade * VERTS_PER_BLADE;
-    // 5 vertices: bl, br, mr, ml, tip
-    // Base left
-    positions.push(px - widthX, py - widthY, pz - widthZ);
-    normals.push(nx, ny, nz); uvs.push(0, seed);
-    // Base right
-    positions.push(px + widthX, py + widthY, pz + widthZ);
-    normals.push(nx, ny, nz); uvs.push(0, seed);
-    // Mid right
-    positions.push(
-      px + widthX*0.5 + nx*height*0.5,
-      py + widthY*0.5 + ny*height*0.5,
-      pz + widthZ*0.5 + nz*height*0.5,
-    );
-    normals.push(nx, ny, nz); uvs.push(0.5, seed);
-    // Mid left
-    positions.push(
-      px - widthX*0.5 + nx*height*0.5,
-      py - widthY*0.5 + ny*height*0.5,
-      pz - widthZ*0.5 + nz*height*0.5,
-    );
-    normals.push(nx, ny, nz); uvs.push(0.5, seed);
-    // Tip
-    positions.push(
-      px + nx*height,
-      py + ny*height,
-      pz + nz*height,
-    );
-    normals.push(nx, ny, nz); uvs.push(1.0, seed);
-
-    indices.push(
-      vi, vi+1, vi+2,
-      vi+2, vi+4, vi+3,
-      vi+3, vi, vi+2,
-    );
+    this.geo = new THREE.BufferGeometry();
+    const posBuf = new THREE.BufferAttribute(this.posArr, 3);
+    posBuf.setUsage(THREE.DynamicDrawUsage);
+    const nrmBuf = new THREE.BufferAttribute(this.nrmArr, 3);
+    nrmBuf.setUsage(THREE.DynamicDrawUsage);
+    const uvBuf = new THREE.BufferAttribute(this.uvArr, 2);
+    uvBuf.setUsage(THREE.DynamicDrawUsage);
+    this.geo.setAttribute('position', posBuf);
+    this.geo.setAttribute('normal', nrmBuf);
+    this.geo.setAttribute('uv', uvBuf);
+    this.geo.setIndex(new THREE.BufferAttribute(this.idxArr, 1));
+    this.geo.setDrawRange(0, 0);
   }
 
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geo.setIndex(indices);
-  return geo;
+  /** Scatter blades onto terrain mesh — writes directly into pre-allocated buffers */
+  scatter(terrainGeo: THREE.BufferGeometry, count: number) {
+    const tPos = terrainGeo.attributes.position.array as Float32Array;
+    const triCount = tPos.length / 9;
+    if (triCount === 0) { this.bladeCount = 0; this.geo.setDrawRange(0, 0); return; }
+
+    count = Math.min(count, MAX_BLADES);
+
+    // Build cumulative area for weighted sampling
+    const cumArea = new Float32Array(triCount);
+    let totalArea = 0;
+    for (let i = 0; i < triCount; i++) {
+      const o = i * 9;
+      const ax = tPos[o+3]-tPos[o], ay = tPos[o+4]-tPos[o+1], az = tPos[o+5]-tPos[o+2];
+      const bx = tPos[o+6]-tPos[o], by = tPos[o+7]-tPos[o+1], bz = tPos[o+8]-tPos[o+2];
+      const cx = ay*bz - az*by, cy = az*bx - ax*bz, cz = ax*by - ay*bx;
+      totalArea += Math.sqrt(cx*cx + cy*cy + cz*cz) * 0.5;
+      cumArea[i] = totalArea;
+    }
+
+    const pos = this.posArr, nrm = this.nrmArr, uv = this.uvArr;
+
+    for (let blade = 0; blade < count; blade++) {
+      // Binary search for triangle (much faster than linear scan)
+      const target = Math.random() * totalArea;
+      let lo = 0, hi = triCount - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; cumArea[mid] < target ? lo = mid + 1 : hi = mid; }
+      const o = lo * 9;
+
+      // Random point on triangle
+      let u = Math.random(), v = Math.random();
+      if (u + v > 1) { u = 1 - u; v = 1 - v; }
+      const w = 1 - u - v;
+      const px = tPos[o]*w + tPos[o+3]*u + tPos[o+6]*v;
+      const py = tPos[o+1]*w + tPos[o+4]*u + tPos[o+7]*v;
+      const pz = tPos[o+2]*w + tPos[o+5]*u + tPos[o+8]*v;
+
+      // Face normal
+      const eax = tPos[o+3]-tPos[o], eay = tPos[o+4]-tPos[o+1], eaz = tPos[o+5]-tPos[o+2];
+      const ebx = tPos[o+6]-tPos[o], eby = tPos[o+7]-tPos[o+1], ebz = tPos[o+8]-tPos[o+2];
+      let nx = eay*ebz - eaz*eby, ny = eaz*ebx - eax*ebz, nz = eax*eby - eay*ebx;
+      const nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+
+      const { t, b } = tangentFrame(nx, ny, nz);
+      const height = BLADE_HEIGHT + Math.random() * BLADE_HEIGHT_VARIATION;
+      const yaw = Math.random() * Math.PI * 2;
+      const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
+      const seed = Math.random();
+      const wx = (t[0]*cosY + b[0]*sinY) * BLADE_WIDTH * 0.5;
+      const wy = (t[1]*cosY + b[1]*sinY) * BLADE_WIDTH * 0.5;
+      const wz = (t[2]*cosY + b[2]*sinY) * BLADE_WIDTH * 0.5;
+
+      const vi = blade * VERTS_PER_BLADE;
+      const pi = vi * 3, ni = vi * 3, ui = vi * 2;
+      // bl
+      pos[pi]   = px-wx; pos[pi+1] = py-wy; pos[pi+2] = pz-wz;
+      nrm[ni]   = nx;    nrm[ni+1] = ny;    nrm[ni+2] = nz;
+      uv[ui]    = 0;     uv[ui+1]  = seed;
+      // br
+      pos[pi+3] = px+wx; pos[pi+4] = py+wy; pos[pi+5] = pz+wz;
+      nrm[ni+3] = nx;    nrm[ni+4] = ny;    nrm[ni+5] = nz;
+      uv[ui+2]  = 0;     uv[ui+3]  = seed;
+      // mr
+      pos[pi+6] = px+wx*0.5+nx*height*0.5; pos[pi+7] = py+wy*0.5+ny*height*0.5; pos[pi+8] = pz+wz*0.5+nz*height*0.5;
+      nrm[ni+6] = nx; nrm[ni+7] = ny; nrm[ni+8] = nz;
+      uv[ui+4]  = 0.5; uv[ui+5] = seed;
+      // ml
+      pos[pi+9] = px-wx*0.5+nx*height*0.5; pos[pi+10] = py-wy*0.5+ny*height*0.5; pos[pi+11] = pz-wz*0.5+nz*height*0.5;
+      nrm[ni+9] = nx; nrm[ni+10] = ny; nrm[ni+11] = nz;
+      uv[ui+6]  = 0.5; uv[ui+7] = seed;
+      // tip
+      pos[pi+12] = px+nx*height; pos[pi+13] = py+ny*height; pos[pi+14] = pz+nz*height;
+      nrm[ni+12] = nx; nrm[ni+13] = ny; nrm[ni+14] = nz;
+      uv[ui+8]   = 1.0; uv[ui+9] = seed;
+    }
+
+    this.bladeCount = count;
+    this.geo.setDrawRange(0, count * INDICES_PER_BLADE);
+    this.geo.attributes.position.needsUpdate = true;
+    this.geo.attributes.normal.needsUpdate = true;
+    this.geo.attributes.uv.needsUpdate = true;
+  }
 }
 
 function createGrassMaterial(): THREE.ShaderMaterial {
@@ -436,7 +459,7 @@ function voxelSculpt(
   field: ScalarField, mesh: THREE.Mesh,
   pt: THREE.Vector3, radius: number, strength: number, tool: SculptTool,
 ) {
-  const amount = strength * 0.15;
+  const amount = strength * 0.5;
   const { x: ax, y: ay, z: az } = sculptState.axes;
 
   // Axis-aware add/remove: extends infinitely along disabled axes
@@ -507,7 +530,7 @@ export function ViewportThree() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [fps, setFps] = useState(0);
   const [ready, setReady] = useState(false);
-  const { selectEntity, entities } = useStudio();
+  const { selectEntity, entities, isPlaying } = useStudio();
   const terrainEntity = entities.find(e => e.id === '__terrain');
 
   const [panMode, setPanMode] = useState(false);
@@ -523,7 +546,15 @@ export function ViewportThree() {
     controls: OrbitControls;
     grassMat: THREE.ShaderMaterial;
     grassMesh: THREE.Mesh;
+    grassBuf: GrassBuffer;
     field: ScalarField;
+    character: THREE.Group | null;
+    charMixer: THREE.AnimationMixer | null;
+    headBone: THREE.Bone | null;
+    headCamMode: boolean;
+    runAction: THREE.AnimationAction | null;
+    jumpAction: THREE.AnimationAction | null;
+    isJumping: boolean;
   } | null>(null);
 
   const selectEntityRef = useRef(selectEntity);
@@ -533,6 +564,9 @@ export function ViewportThree() {
     painting: false, flatTarget: 0,
     panMode: false,
   });
+
+  // WASD key state
+  const keys = useRef({ w: false, a: false, s: false, d: false });
 
   // Sync sculptState → Three.js
   useEffect(() => {
@@ -546,10 +580,7 @@ export function ViewportThree() {
       // Rebuild grass if density changed
       if (sculptState.grassDensity !== prevDensity) {
         prevDensity = sculptState.grassDensity;
-        const geo = tr.terrain.geometry;
-        const newGrassGeo = scatterGrassOnMesh(geo, grassBladeCount(geo));
-        tr.grassMesh.geometry.dispose();
-        tr.grassMesh.geometry = newGrassGeo;
+        tr.grassBuf.scatter(tr.terrain.geometry, grassBladeCount(tr.terrain.geometry));
       }
 
       // Rebuild voxel field if resolution changed
@@ -578,13 +609,40 @@ export function ViewportThree() {
         const newGeo = generateMesh(newField);
         tr.terrain.geometry.dispose();
         tr.terrain.geometry = newGeo;
-        const newGrassGeo = scatterGrassOnMesh(newGeo, grassBladeCount(newGeo));
-        tr.grassMesh.geometry.dispose();
-        tr.grassMesh.geometry = newGrassGeo;
+        tr.grassBuf.scatter(newGeo, grassBladeCount(newGeo));
       }
     });
     return unsub;
   }, []);
+
+  // Sync isPlaying → show/hide character, toggle head-cam
+  useEffect(() => {
+    const tr = threeRef.current;
+    if (!tr) return;
+    if (tr.character) {
+      tr.character.visible = isPlaying;
+    }
+    if (isPlaying) {
+      // Start running animation and head-cam
+      if (tr.runAction) tr.runAction.reset().play();
+      if (tr.headBone) {
+        tr.headCamMode = true;
+        tr.controls.enabled = false;
+      }
+    } else {
+      // Stop animations and return to orbit
+      if (tr.runAction) tr.runAction.stop();
+      if (tr.jumpAction) tr.jumpAction.stop();
+      tr.isJumping = false;
+      tr.headCamMode = false;
+      tr.controls.enabled = true;
+      // Reset character position
+      if (tr.character) {
+        tr.character.position.set(0, 0, 0);
+        tr.character.rotation.set(0, 0, 0);
+      }
+    }
+  }, [isPlaying]);
 
   // Sync terrain entity transform → Three.js group
   useEffect(() => {
@@ -633,6 +691,13 @@ export function ViewportThree() {
     // Prevent context menu on right-click
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+    // ── Lighting (for FBX character materials) ──
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 10, 3);
+    scene.add(dirLight);
+
     // ── Terrain group ──
     const terrainGroup = new THREE.Group();
     scene.add(terrainGroup);
@@ -664,10 +729,11 @@ export function ViewportThree() {
     bottom.position.y = BOTTOM_Y;
     terrainGroup.add(bottom);
 
-    // ── Grass (scattered on mesh faces) ──
+    // ── Grass (pre-allocated buffer, no alloc during sculpt) ──
     const grassMat = createGrassMaterial();
-    const grassGeo = scatterGrassOnMesh(tGeo, grassBladeCount(tGeo));
-    const grassMesh = new THREE.Mesh(grassGeo, grassMat);
+    const grassBuf = new GrassBuffer();
+    grassBuf.scatter(tGeo, grassBladeCount(tGeo));
+    const grassMesh = new THREE.Mesh(grassBuf.geo, grassMat);
     terrainGroup.add(grassMesh);
 
     // ── Brush cursor ──
@@ -679,8 +745,71 @@ export function ViewportThree() {
     cursor.visible = false;
     scene.add(cursor);
 
-    threeRef.current = { terrain, skirt, bottom, terrainGroup, tMat, wMat, cursor, controls, grassMat, grassMesh, field };
+    threeRef.current = { terrain, skirt, bottom, terrainGroup, tMat, wMat, cursor, controls, grassMat, grassMesh, grassBuf, field, character: null, charMixer: null, headBone: null, headCamMode: false, runAction: null, jumpAction: null, isJumping: false };
     setReady(true);
+
+    // ── Load character (Running.fbx + Running Jump.fbx) ──
+    const fbxLoader = new FBXLoader();
+    fbxLoader.load('/animations/Running.fbx', (fbx) => {
+      if (disposed || !threeRef.current) return;
+
+      fbx.scale.setScalar(0.01);
+      fbx.position.set(0, 0, 0);
+      fbx.visible = false; // hidden until play
+
+      // Find the head bone for camera mount
+      let headBone: THREE.Bone | null = null;
+      fbx.traverse((child) => {
+        if (child instanceof THREE.Bone) {
+          const name = child.name.toLowerCase();
+          if (name.includes('head') && !name.includes('top') && !name.includes('end')) {
+            headBone = child;
+          }
+        }
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => { m.side = THREE.DoubleSide; });
+          } else {
+            mesh.material.side = THREE.DoubleSide;
+          }
+          mesh.castShadow = true;
+        }
+      });
+
+      const mixer = new THREE.AnimationMixer(fbx);
+      let runAction: THREE.AnimationAction | null = null;
+      if (fbx.animations.length > 0) {
+        runAction = mixer.clipAction(fbx.animations[0]);
+      }
+
+      scene.add(fbx);
+      threeRef.current.character = fbx;
+      threeRef.current.charMixer = mixer;
+      threeRef.current.headBone = headBone;
+      threeRef.current.runAction = runAction;
+
+      // Load jump animation onto the same mixer
+      fbxLoader.load('/animations/Running Jump.fbx', (jumpFbx) => {
+        if (disposed || !threeRef.current) return;
+        if (jumpFbx.animations.length > 0) {
+          const jumpAction = mixer.clipAction(jumpFbx.animations[0]);
+          jumpAction.setLoop(THREE.LoopOnce, 1);
+          jumpAction.clampWhenFinished = true;
+          threeRef.current.jumpAction = jumpAction;
+
+          // When jump finishes, crossfade back to run
+          mixer.addEventListener('finished', () => {
+            if (!threeRef.current) return;
+            threeRef.current.isJumping = false;
+            if (threeRef.current.runAction) {
+              jumpAction.crossFadeTo(threeRef.current.runAction, 0.2, true);
+              threeRef.current.runAction.reset().play();
+            }
+          });
+        }
+      });
+    });
 
     // ── Raycaster ──
     const ray = new THREE.Raycaster();
@@ -697,13 +826,6 @@ export function ViewportThree() {
 
     function doSculpt(point: THREE.Vector3) {
       voxelSculpt(field, terrain, point, sculptState.size, sculptState.strength, sculptState.tool);
-    }
-
-    function rebuildGrass() {
-      const tr = threeRef.current!;
-      const newGrassGeo = scatterGrassOnMesh(terrain.geometry, grassBladeCount(terrain.geometry));
-      tr.grassMesh.geometry.dispose();
-      tr.grassMesh.geometry = newGrassGeo;
     }
 
     // ── Pointer events (sculpt) ──
@@ -730,7 +852,10 @@ export function ViewportThree() {
     }
     function onUp(e: PointerEvent) {
       if (e.button === 0) {
-        if (st.current.painting) rebuildGrass();
+        if (st.current.painting) {
+          const tr = threeRef.current!;
+          tr.grassBuf.scatter(terrain.geometry, grassBladeCount(terrain.geometry));
+        }
         st.current.painting = false;
       }
     }
@@ -749,8 +874,46 @@ export function ViewportThree() {
 
     // ── Wheel: orbit / pinch-zoom / pan / brush-size ──
     let bHeld = false;
-    function onKeyDown(e: KeyboardEvent) { if (e.key === 'b' || e.key === 'B') bHeld = true; }
-    function onKeyUp(e: KeyboardEvent) { if (e.key === 'b' || e.key === 'B') bHeld = false; }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'b' || e.key === 'B') bHeld = true;
+      // WASD movement
+      const k = e.key.toLowerCase();
+      if (k === 'w') keys.current.w = true;
+      if (k === 'a') keys.current.a = true;
+      if (k === 's') keys.current.s = true;
+      if (k === 'd') keys.current.d = true;
+      // Space = jump
+      if (e.key === ' ') {
+        e.preventDefault();
+        const tr = threeRef.current;
+        if (tr && tr.jumpAction && tr.runAction && !tr.isJumping && tr.character?.visible) {
+          tr.isJumping = true;
+          tr.runAction.crossFadeTo(tr.jumpAction, 0.2, true);
+          tr.jumpAction.reset().play();
+        }
+      }
+      // V toggles head-cam mode
+      if (e.key === 'v' || e.key === 'V') {
+        const tr = threeRef.current;
+        if (tr && tr.headBone) {
+          tr.headCamMode = !tr.headCamMode;
+          controls.enabled = !tr.headCamMode;
+          if (!tr.headCamMode) {
+            cam.position.set(-12, 8, 12);
+            controls.target.set(0, 1, 0);
+            controls.update();
+          }
+        }
+      }
+    }
+    function onKeyUp(e: KeyboardEvent) {
+      if (e.key === 'b' || e.key === 'B') bHeld = false;
+      const k = e.key.toLowerCase();
+      if (k === 'w') keys.current.w = false;
+      if (k === 'a') keys.current.a = false;
+      if (k === 's') keys.current.s = false;
+      if (k === 'd') keys.current.d = false;
+    }
 
     function onWheel(e: WheelEvent) {
       // Only act when canvas is the target
@@ -795,13 +958,53 @@ export function ViewportThree() {
 
     // ── Render loop ──
     let fc = 0, fa = 0, lt = performance.now();
+    const clock = new THREE.Clock();
+    const headOffset = new THREE.Vector3(0, 0.15, 0); // slightly above head bone
+    const _worldPos = new THREE.Vector3();
+    const _worldQuat = new THREE.Quaternion();
+    const MOVE_SPEED = 5;
+    const TURN_SPEED = 2.5;
     function animate(time: number) {
       if (disposed) return;
       const now = performance.now();
+      const delta = clock.getDelta();
       fc++; fa += now - lt; lt = now;
       if (fa >= 500) { setFps(Math.round(fc / (fa / 1000))); fc = 0; fa = 0; }
       grassMat.uniforms.uTime.value = time;
-      controls.update();
+
+      // Update character animation
+      const tr = threeRef.current;
+      if (tr?.charMixer) {
+        tr.charMixer.update(delta);
+      }
+
+      // WASD movement
+      if (tr?.character) {
+        const char = tr.character;
+        const k = keys.current;
+        // A/D rotate the character
+        if (k.a) char.rotation.y += TURN_SPEED * delta;
+        if (k.d) char.rotation.y -= TURN_SPEED * delta;
+        // W/S move forward/backward relative to character facing
+        if (k.w || k.s) {
+          const dir = k.w ? 1 : -1;
+          char.position.x += Math.sin(char.rotation.y) * MOVE_SPEED * delta * dir;
+          char.position.z += Math.cos(char.rotation.y) * MOVE_SPEED * delta * dir;
+        }
+      }
+
+      // Mount camera to head bone
+      if (tr?.headBone && tr.headCamMode) {
+        tr.headBone.getWorldPosition(_worldPos);
+        tr.headBone.getWorldQuaternion(_worldQuat);
+        // Position camera at head + offset
+        cam.position.copy(_worldPos).add(headOffset);
+        // Look forward from the character's facing direction
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(_worldQuat);
+        cam.lookAt(_worldPos.clone().add(forward));
+      } else {
+        controls.update();
+      }
 
       renderer.render(scene, cam);
       requestAnimationFrame(animate);
