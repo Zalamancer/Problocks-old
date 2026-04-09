@@ -1,6 +1,7 @@
 import { getQuickJS, type QuickJSContext, type QuickJSHandle } from 'quickjs-emscripten';
 import { ScriptRuntime, type ScriptRuntimeConfig } from './script-runtime.js';
 import type { SimulationLoop } from '../core/simulation-loop.js';
+import { registerAPIExtensions, type APIExtensionDeps } from './api-extensions.js';
 
 /**
  * QuickJS-in-WASM sandbox runtime.
@@ -31,6 +32,14 @@ export class QuickJSRuntime extends ScriptRuntime {
    */
   bindSimulation(sim: SimulationLoop): void {
     this.sim = sim;
+  }
+
+  /**
+   * Register all engine system API extensions (tilemap, camera, audio, etc.)
+   * onto the `pb.*` namespace. Call after init() — the VM must be running.
+   */
+  bindExtensions(deps: APIExtensionDeps): void {
+    registerAPIExtensions(this, deps);
   }
 
   async init(config: ScriptRuntimeConfig): Promise<void> {
@@ -235,6 +244,7 @@ export class QuickJSRuntime extends ScriptRuntime {
   registerHostFunction(name: string, fn: (...args: unknown[]) => unknown): void {
     if (!this.vm) return;
     const pb = this.vm.getProp(this.vm.global, 'pb');
+
     const hostFn = this.vm.newFunction(name, (...args) => {
       const jsArgs = args.map(a => this.vm!.dump(a));
       const result = fn(...jsArgs);
@@ -242,7 +252,45 @@ export class QuickJSRuntime extends ScriptRuntime {
       if (typeof result === 'string') return this.vm!.newString(result);
       return this.vm!.undefined;
     });
-    this.vm.setProp(pb, name, hostFn);
+
+    // Support dotted names: "tilemap.setTile" → pb.tilemap.setTile
+    const parts = name.split('.');
+    if (parts.length === 1) {
+      // Flat property on pb
+      this.vm.setProp(pb, name, hostFn);
+    } else {
+      // Walk/create intermediate namespace objects.
+      // Track all intermediate handles so we can dispose them after setting
+      // the final property. We must NOT dispose a handle while it's still
+      // being used as `parent`.
+      let parent = pb;
+      const intermediates: QuickJSHandle[] = [];
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        const existing = this.vm.getProp(parent, parts[i]);
+        if (this.vm.typeof(existing) === 'object') {
+          // Namespace already exists — advance into it
+          parent = existing;
+          intermediates.push(existing);
+        } else {
+          // Create new namespace object
+          existing.dispose();
+          const ns = this.vm.newObject();
+          this.vm.setProp(parent, parts[i], ns);
+          parent = ns;
+          intermediates.push(ns);
+        }
+      }
+
+      this.vm.setProp(parent, parts[parts.length - 1], hostFn);
+
+      // Dispose intermediate handles (they're refs to objects that live in
+      // the VM, so disposing the handle is safe — the object persists).
+      for (const h of intermediates) {
+        h.dispose();
+      }
+    }
+
     hostFn.dispose();
     pb.dispose();
   }

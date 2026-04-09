@@ -69,3 +69,10 @@ export * from './procgen/index.js';
 
 // Rule-based placement
 export * from './placement/index.js';
+
+// AI — behavior trees, FSM, presets
+export * from './ai/index.js';
+
+// Scripting API extensions
+export { registerAPIExtensions } from './scripting/api-extensions.js';
+export type { APIExtensionDeps } from './scripting/api-extensions.js';
