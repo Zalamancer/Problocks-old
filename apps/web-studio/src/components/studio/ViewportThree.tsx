@@ -536,6 +536,8 @@ export function ViewportThree() {
   const terrainEntity = entities.find(e => e.id === '__terrain');
 
   const [panMode, setPanMode] = useState(false);
+  const [grassEnabled, setGrassEnabled] = useState(true);
+  const grassEnabledRef = useRef(true);
 
   const threeRef = useRef<{
     terrain: THREE.Mesh;
@@ -561,6 +563,7 @@ export function ViewportThree() {
 
   const selectEntityRef = useRef(selectEntity);
   selectEntityRef.current = selectEntity;
+  grassEnabledRef.current = grassEnabled;
 
   const st = useRef({
     painting: false, flatTarget: 0,
@@ -982,6 +985,7 @@ export function ViewportThree() {
         setDrawCalls(renderer.info.render.calls);
         fc = 0; fa = 0;
       }
+      if (tr?.grassMesh) tr.grassMesh.visible = grassEnabledRef.current;
       grassMat.uniforms.uTime.value = time;
 
       // Update character animation
@@ -1074,6 +1078,12 @@ export function ViewportThree() {
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">{ready ? `${(triangles * 3).toLocaleString()} verts` : '--'}</span>
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">{ready ? `${triangles.toLocaleString()} tris` : '--'}</span>
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">{ready ? `${drawCalls} draws` : '--'}</span>
+        <button
+          onClick={() => setGrassEnabled(g => !g)}
+          className={`rounded px-2 py-0.5 text-[10px] cursor-pointer ${grassEnabled ? 'bg-green-700/80 text-green-200' : 'bg-red-900/80 text-red-300'}`}
+        >
+          Grass: {grassEnabled ? 'ON' : 'OFF'}
+        </button>
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">Three.js</span>
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">
           Left click: sculpt &bull; Right drag: orbit &bull; Scroll: orbit &bull; Pinch: zoom &bull; Dbl-click: pan mode
