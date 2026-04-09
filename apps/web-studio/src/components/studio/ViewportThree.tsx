@@ -985,11 +985,11 @@ export function ViewportThree() {
         setDrawCalls(renderer.info.render.calls);
         fc = 0; fa = 0;
       }
-      if (tr?.grassMesh) tr.grassMesh.visible = grassEnabledRef.current;
       grassMat.uniforms.uTime.value = time;
 
       // Update character animation
       const tr = threeRef.current;
+      if (tr?.grassMesh) tr.grassMesh.visible = grassEnabledRef.current;
       if (tr?.charMixer) {
         tr.charMixer.update(delta);
       }
