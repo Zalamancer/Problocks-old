@@ -5,6 +5,7 @@ import type { AssetEntry } from '@problocks/engine';
 import { saveScene, loadScene, clearScene } from './storage';
 import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import type { QuickJSRuntime } from '@problocks/engine/scripting/quickjs-runtime';
+import type { Grid } from '@problocks/engine';
 
 export function StudioProvider({ children }: { children: ReactNode }) {
   const [entities, setEntities] = useState<EntityData[]>(() => loadScene() ?? DEFAULT_ENTITIES);
@@ -110,15 +111,46 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     saveScene(entities);
   }, [entities]);
 
-  const runScript = useCallback(async (code: string) => {
-    // Get sim from viewport (registered on window)
-    const sim = (window as any).__problocks_sim;
-    if (!sim) {
-      addLog('[error] Engine not ready — wait for viewport to load');
-      return;
-    }
-    simRef.current = sim;
+  // Ref for the tilemap tick interval (used by tilemap script mode)
+  const tilemapTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /**
+   * Sync a Grid instance back to the store's tilemapConfig.
+   * Reads all tiles from the Grid's chunk storage and writes them
+   * into a TilemapConfig-shaped data structure.
+   */
+  const syncGridToConfig = useCallback((grid: Grid, mapWidth: number, mapHeight: number, layerCount: number) => {
+    const layers = [];
+    for (let li = 0; li < layerCount; li++) {
+      const data: number[][] = [];
+      for (let y = 0; y < mapHeight; y++) {
+        const row: number[] = [];
+        for (let x = 0; x < mapWidth; x++) {
+          row.push(grid.getTile(li, x, y));
+        }
+        data.push(row);
+      }
+      layers.push({
+        name: li === 0 ? 'Ground' : li === 1 ? 'Objects' : `Layer ${li}`,
+        data,
+        visible: true,
+        opacity: 1,
+      });
+    }
+
+    const config: TilemapConfig = {
+      gridType: 'orthogonal',
+      tileWidth: 32,
+      tileHeight: 32,
+      mapWidth,
+      mapHeight,
+      layers,
+    };
+
+    setTilemapConfigRaw(config);
+  }, []);
+
+  const runScript = useCallback(async (code: string) => {
     // Intercept console.log from sandbox
     const origLog = console.log;
     console.log = (...args: unknown[]) => {
@@ -138,37 +170,86 @@ export function StudioProvider({ children }: { children: ReactNode }) {
         sandboxRef.current.dispose();
       }
 
+      // Get sim from viewport (registered on window) — only available in 3D mode
+      const sim = (window as any).__problocks_sim;
+
       const { QuickJSRuntime } = await import('@problocks/engine/scripting/quickjs-runtime');
       const sandbox = new QuickJSRuntime();
       await sandbox.init({ maxFrameMs: 100, maxMemoryBytes: 10 * 1024 * 1024, maxApiCallsPerSec: 60 });
-      sandbox.bindSimulation(simRef.current!);
-      sandboxRef.current = sandbox;
 
-      // Load and execute the student code
-      await sandbox.loadSimulation(code);
+      if (sim) {
+        // ── 3D mode: bind to SimulationLoop for physics ──
+        simRef.current = sim;
+        sandbox.bindSimulation(sim);
+        sandboxRef.current = sandbox;
 
-      // Wire tick
-      simRef.current!.onFrame((dt) => {
-        if (sandboxRef.current) sandboxRef.current.callTick(dt);
-      });
+        await sandbox.loadSimulation(code);
 
-      // Auto-start physics
-      simRef.current!.start();
-      setIsPlaying(true);
+        sim.onFrame((dt: number) => {
+          if (sandboxRef.current) sandboxRef.current.callTick(dt);
+        });
 
-      addLog('--- Script running (physics started) ---');
+        sim.start();
+        setIsPlaying(true);
+        addLog('--- Script running (physics started) ---');
+      } else {
+        // ── Tilemap / 2D mode: lightweight sandbox with API extensions ──
+        // No physics sim needed. Wire tilemap, procgen, nav, lighting, camera
+        // APIs directly to engine instances, then sync tilemap changes to store.
+
+        const { Grid, NavigationGrid } = await import('@problocks/engine');
+
+        // Create engine instances for the script
+        const mapWidth = 64;
+        const mapHeight = 64;
+        const layerCount = 3;
+        const grid = new Grid(32, 32, 'orthogonal', layerCount);
+        const navGrid = new NavigationGrid(mapWidth, mapHeight);
+
+        // Bind API extensions (tilemap, procgen, nav, lighting, etc.)
+        sandbox.bindExtensions({
+          grid,
+          navGrid,
+          // camera, audio, lighting, etc. are optional — gracefully no-op
+        });
+
+        sandboxRef.current = sandbox;
+
+        // Execute the student code (calls onStart)
+        await sandbox.loadSimulation(code);
+
+        // Sync Grid contents → store tilemapConfig (immediate update after onStart)
+        syncGridToConfig(grid, mapWidth, mapHeight, layerCount);
+
+        // Set up a lightweight tick loop for onTick (100ms ~ 10fps)
+        // Slower than physics tick but sufficient for tilemap updates.
+        tilemapTickRef.current = setInterval(() => {
+          if (sandboxRef.current) {
+            sandboxRef.current.callTick(0.1);
+            // Re-sync tilemap after each tick in case it was modified
+            syncGridToConfig(grid, mapWidth, mapHeight, layerCount);
+          }
+        }, 100);
+
+        setIsPlaying(true);
+        addLog('--- Script running (tilemap mode) ---');
+      }
     } catch (err: any) {
       addLog(`[error] ${err.message}`);
       setScriptRunning(false);
     } finally {
       console.log = origLog;
     }
-  }, [addLog]);
+  }, [addLog, syncGridToConfig]);
 
   const stopScript = useCallback(() => {
     if (sandboxRef.current) {
       sandboxRef.current.dispose();
       sandboxRef.current = null;
+    }
+    if (tilemapTickRef.current) {
+      clearInterval(tilemapTickRef.current);
+      tilemapTickRef.current = null;
     }
     if (simRef.current) {
       simRef.current.stop();

@@ -1,0 +1,2327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Problocks Engine Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0a; color: #e4e4e7; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+  .header { padding: 12px 20px; border-bottom: 1px solid #222; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 18px; font-weight: 600; color: #3b82f6; }
+  .header span { font-size: 12px; color: #71717a; }
+  .tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid #222; background: #111; }
+  .tab-btn { padding: 8px 14px; background: #1a1a2e; border: none; color: #a1a1aa; cursor: pointer; font-size: 13px; font-family: inherit; transition: all 0.15s; border-bottom: 2px solid transparent; }
+  .tab-btn:hover { background: #222240; color: #e4e4e7; }
+  .tab-btn.active { background: #1e293b; color: #3b82f6; border-bottom-color: #3b82f6; }
+  .main { display: flex; flex-direction: column; height: calc(100vh - 90px); }
+  .canvas-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; position: relative; }
+  .canvas-area canvas { background: #111; border: 1px solid #1e293b; border-radius: 4px; display: block; image-rendering: pixelated; }
+  .controls { padding: 12px 20px; border-top: 1px solid #222; background: #111; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 50px; }
+  .controls label { font-size: 12px; color: #a1a1aa; display: flex; align-items: center; gap: 4px; }
+  .controls input[type=range] { width: 80px; accent-color: #3b82f6; }
+  .controls input[type=number], .controls input[type=color] { background: #1a1a2e; border: 1px solid #333; color: #e4e4e7; padding: 3px 6px; border-radius: 3px; width: 60px; font-family: monospace; font-size: 12px; }
+  .controls input[type=color] { width: 30px; height: 24px; padding: 1px; cursor: pointer; }
+  .controls select { background: #1a1a2e; border: 1px solid #333; color: #e4e4e7; padding: 3px 6px; border-radius: 3px; font-size: 12px; }
+  .btn { padding: 5px 12px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; transition: background 0.15s; }
+  .btn:hover { background: #2563eb; }
+  .btn.secondary { background: #374151; }
+  .btn.secondary:hover { background: #4b5563; }
+  .btn.active { background: #22c55e; }
+  .status { font-size: 11px; color: #71717a; font-family: monospace; margin-left: auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; width: 100%; height: 100%; }
+  .split-canvas { display: flex; gap: 12px; width: 100%; height: 100%; padding: 12px; }
+  .split-canvas canvas { flex: 1; background: #111; border: 1px solid #1e293b; border-radius: 4px; }
+  .info-bar { position: absolute; top: 16px; left: 16px; font-size: 11px; font-family: monospace; color: #71717a; background: rgba(10,10,10,0.8); padding: 4px 8px; border-radius: 3px; pointer-events: none; z-index: 2; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Problocks Engine Demo</h1>
+  <span>Interactive showcase of all engine systems</span>
+</div>
+<div class="tabs" id="tabs">
+  <button class="tab-btn active" data-tab="dungeon">Dungeon</button>
+  <button class="tab-btn" data-tab="pathfinding">Pathfinding</button>
+  <button class="tab-btn" data-tab="particles">Particles</button>
+  <button class="tab-btn" data-tab="lighting">Lighting</button>
+  <button class="tab-btn" data-tab="animation">Animation</button>
+  <button class="tab-btn" data-tab="wfc">WFC</button>
+  <button class="tab-btn" data-tab="poisson">Poisson/L-Sys</button>
+  <button class="tab-btn" data-tab="ai">AI Behavior</button>
+  <button class="tab-btn" data-tab="audio">Audio</button>
+</div>
+<div class="main">
+  <div class="canvas-area" id="canvasArea"></div>
+  <div class="controls" id="controls"></div>
+</div>
+
+<script>
+// ============================================================
+// SHARED UTILITIES
+// ============================================================
+function createRNG(seed) {
+  let s = seed | 0;
+  return () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function randomInt(rng, min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
+function randomFloat(rng, min, max) { return rng() * (max - min) + min; }
+function hexToRgb(hex) { return { r: (hex >> 16) & 0xff, g: (hex >> 8) & 0xff, b: hex & 0xff }; }
+function rgbStr(r, g, b, a) { return a !== undefined ? `rgba(${r|0},${g|0},${b|0},${a})` : `rgb(${r|0},${g|0},${b|0})`; }
+function hexStr(hex, a) { const c = hexToRgb(hex); return rgbStr(c.r, c.g, c.b, a); }
+function lerpColor(a, b, t) {
+  const ca = hexToRgb(a), cb = hexToRgb(b);
+  return ((Math.round(ca.r + (cb.r - ca.r) * t) & 0xff) << 16) | ((Math.round(ca.g + (cb.g - ca.g) * t) & 0xff) << 8) | (Math.round(ca.b + (cb.b - ca.b) * t) & 0xff);
+}
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+const canvasArea = document.getElementById('canvasArea');
+const controlsDiv = document.getElementById('controls');
+let activeTab = 'dungeon';
+let activeCleanup = null;
+let animFrame = null;
+
+// ============================================================
+// TAB SYSTEM
+// ============================================================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    switchTab(btn.dataset.tab);
+  });
+});
+
+function switchTab(tab) {
+  if (activeCleanup) { activeCleanup(); activeCleanup = null; }
+  if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+  activeTab = tab;
+  canvasArea.innerHTML = '';
+  controlsDiv.innerHTML = '';
+  const init = tabInits[tab];
+  if (init) init();
+}
+
+function createCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.style.maxWidth = '100%'; c.style.maxHeight = '100%';
+  return c;
+}
+
+function fitCanvas(c) {
+  const area = canvasArea;
+  const aw = area.clientWidth - 24;
+  const ah = area.clientHeight - 24;
+  const scale = Math.min(aw / c.width, ah / c.height, 1);
+  c.style.width = (c.width * scale) + 'px';
+  c.style.height = (c.height * scale) + 'px';
+}
+
+// ============================================================
+// TAB 1: DUNGEON GENERATOR + AUTO-FURNISH
+// ============================================================
+let dungeonData = null;
+
+function initDungeon() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  let seed = 42, mapW = 50, mapH = 40, depth = 5, corrW = 1, furnished = false;
+  let furnitureData = null;
+
+  controlsDiv.innerHTML = `
+    <label>Seed <input type="number" id="dSeed" value="42" style="width:55px"></label>
+    <label>Width <input type="range" id="dW" min="30" max="100" value="50"><span id="dWv">50</span></label>
+    <label>Height <input type="range" id="dH" min="30" max="80" value="40"><span id="dHv">40</span></label>
+    <label>Depth <input type="range" id="dDepth" min="3" max="7" value="5"><span id="dDv">5</span></label>
+    <label>Corridor <input type="range" id="dCorr" min="1" max="3" value="1"><span id="dCv">1</span></label>
+    <button class="btn" id="dGen">Generate</button>
+    <button class="btn secondary" id="dFurn">Furnish</button>
+    <span class="status" id="dStatus"></span>
+  `;
+
+  const sE = (id) => document.getElementById(id);
+  sE('dW').oninput = function(){ sE('dWv').textContent = this.value; mapW = +this.value; };
+  sE('dH').oninput = function(){ sE('dHv').textContent = this.value; mapH = +this.value; };
+  sE('dDepth').oninput = function(){ sE('dDv').textContent = this.value; depth = +this.value; };
+  sE('dCorr').oninput = function(){ sE('dCv').textContent = this.value; corrW = +this.value; };
+
+  function generate() {
+    seed = +(sE('dSeed').value) || Date.now();
+    furnished = false;
+    furnitureData = null;
+    dungeonData = generateDungeon(mapW, mapH, { seed, splitDepth: depth, corridorWidth: corrW });
+    draw();
+    sE('dStatus').textContent = `${dungeonData.rooms.length} rooms, seed: ${seed}`;
+  }
+
+  function furnish() {
+    if (!dungeonData) return;
+    furnitureData = autoFurnish(dungeonData, seed);
+    furnished = true;
+    draw();
+    let count = 0;
+    furnitureData.forEach(items => count += items.length);
+    sE('dStatus').textContent += ` | ${count} furniture placed`;
+  }
+
+  const roomTypeColors = {
+    kitchen: '#e67e22', bedroom: '#3498db', tavern: '#e74c3c', library: '#27ae60',
+    armory: '#8e44ad', 'dungeon-cell': '#7f8c8d', storage: '#95a5a6', bathroom: '#1abc9c',
+    'throne-room': '#f1c40f', entrance: '#d4ac0d', corridor: '#5d4e37'
+  };
+
+  function draw() {
+    if (!dungeonData) return;
+    ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, W, H);
+    const d = dungeonData;
+    const cs = Math.min(Math.floor((W - 20) / d.width), Math.floor((H - 20) / d.height));
+    const ox = Math.floor((W - d.width * cs) / 2);
+    const oy = Math.floor((H - d.height * cs) / 2);
+
+    // Draw tiles
+    for (let y = 0; y < d.height; y++) {
+      for (let x = 0; x < d.width; x++) {
+        const t = d.tileMap[y][x];
+        let color = '#1a1a1a'; // wall
+        if (t === 1) color = '#2a2a3a'; // floor
+        if (t === 2) color = '#3d2b1a'; // corridor
+        if (t === 3) color = '#eab308'; // door
+        ctx.fillStyle = color;
+        ctx.fillRect(ox + x * cs, oy + y * cs, cs, cs);
+      }
+    }
+
+    // Color rooms by type
+    for (const room of d.rooms) {
+      const type = room.type || 'bedroom';
+      const col = roomTypeColors[type] || '#555';
+      ctx.fillStyle = col + '33';
+      ctx.fillRect(ox + room.x * cs, oy + room.y * cs, room.width * cs, room.height * cs);
+      // Room type label
+      ctx.fillStyle = col;
+      ctx.font = `bold ${Math.max(9, cs - 2)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(type.substring(0, 7), ox + (room.x + room.width / 2) * cs, oy + (room.y + room.height / 2) * cs + 3);
+    }
+
+    // Draw furniture
+    if (furnished && furnitureData) {
+      const fColors = { S: '#ff6600', T: '#8B4513', B: '#4169E1', C: '#FFD700', W: '#8B008B', R: '#228B22', K: '#DC143C', L: '#00CED1', A: '#9370DB', H: '#FF69B4', P: '#FFA07A' };
+      furnitureData.forEach((items, roomId) => {
+        for (const item of items) {
+          const label = item.name[0].toUpperCase();
+          ctx.fillStyle = fColors[label] || '#aaa';
+          ctx.globalAlpha = 0.85;
+          ctx.fillRect(ox + item.x * cs + 1, oy + item.y * cs + 1, (item.w || 1) * cs - 2, (item.h || 1) * cs - 2);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#fff';
+          ctx.font = `bold ${Math.max(7, cs - 4)}px monospace`;
+          ctx.textAlign = 'center';
+          ctx.fillText(label, ox + (item.x + (item.w || 1) / 2) * cs, oy + (item.y + (item.h || 1) / 2) * cs + 3);
+        }
+      });
+    }
+
+    // Grid lines
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 0.3;
+    for (let y = 0; y <= d.height; y++) {
+      ctx.beginPath(); ctx.moveTo(ox, oy + y * cs); ctx.lineTo(ox + d.width * cs, oy + y * cs); ctx.stroke();
+    }
+    for (let x = 0; x <= d.width; x++) {
+      ctx.beginPath(); ctx.moveTo(ox + x * cs, oy); ctx.lineTo(ox + x * cs, oy + d.height * cs); ctx.stroke();
+    }
+  }
+
+  sE('dGen').onclick = generate;
+  sE('dFurn').onclick = furnish;
+  generate();
+}
+
+function generateDungeon(width, height, options) {
+  const seed = options?.seed ?? Date.now();
+  const minRoomSize = options?.minRoomSize ?? 5;
+  const maxRoomSize = options?.maxRoomSize ?? 15;
+  const roomPadding = options?.roomPadding ?? 1;
+  const splitDepth = options?.splitDepth ?? 5;
+  const corridorWidth = options?.corridorWidth ?? 1;
+  const doorChance = options?.doorChance ?? 0.5;
+  const roomTypes = ['kitchen','bedroom','tavern','library','armory','dungeon-cell','storage','bathroom'];
+  const rng = createRNG(seed);
+  const tileMap = [];
+  for (let y = 0; y < height; y++) tileMap[y] = new Array(width).fill(0);
+  const rooms = [], corridors = [];
+  let nextId = 0;
+
+  function splitNode(node, d) {
+    if (d <= 0) return;
+    const canH = node.height >= minRoomSize * 2 + roomPadding * 2;
+    const canV = node.width >= minRoomSize * 2 + roomPadding * 2;
+    if (!canH && !canV) return;
+    let horiz;
+    if (!canH) horiz = false; else if (!canV) horiz = true;
+    else horiz = node.height > node.width ? true : node.width > node.height ? false : rng() > 0.5;
+
+    if (horiz) {
+      const mn = Math.floor(node.height * 0.3), mx = Math.floor(node.height * 0.7);
+      const sp = randomInt(rng, Math.max(mn, minRoomSize + roomPadding), Math.min(mx, node.height - minRoomSize - roomPadding));
+      node.left = { x: node.x, y: node.y, width: node.width, height: sp };
+      node.right = { x: node.x, y: node.y + sp, width: node.width, height: node.height - sp };
+    } else {
+      const mn = Math.floor(node.width * 0.3), mx = Math.floor(node.width * 0.7);
+      const sp = randomInt(rng, Math.max(mn, minRoomSize + roomPadding), Math.min(mx, node.width - minRoomSize - roomPadding));
+      node.left = { x: node.x, y: node.y, width: sp, height: node.height };
+      node.right = { x: node.x + sp, y: node.y, width: node.width - sp, height: node.height };
+    }
+    splitNode(node.left, d - 1);
+    splitNode(node.right, d - 1);
+  }
+
+  const root = { x: 0, y: 0, width, height };
+  splitNode(root, splitDepth);
+
+  function createRooms(node) {
+    if (node.left && node.right) { createRooms(node.left); createRooms(node.right); return; }
+    const mw = Math.min(maxRoomSize, node.width - roomPadding * 2);
+    const mh = Math.min(maxRoomSize, node.height - roomPadding * 2);
+    if (mw < minRoomSize || mh < minRoomSize) return;
+    const rw = randomInt(rng, minRoomSize, mw), rh = randomInt(rng, minRoomSize, mh);
+    const rx = randomInt(rng, node.x + roomPadding, node.x + node.width - rw - roomPadding);
+    const ry = randomInt(rng, node.y + roomPadding, node.y + node.height - rh - roomPadding);
+    const room = { x: rx, y: ry, width: rw, height: rh, id: nextId++, connections: [], type: roomTypes[randomInt(rng, 0, roomTypes.length - 1)] };
+    node.room = room; rooms.push(room);
+    for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) {
+      if (y >= 0 && y < height && x >= 0 && x < width) tileMap[y][x] = 1;
+    }
+  }
+  createRooms(root);
+
+  function getRoom(node) {
+    if (node.room) return node.room;
+    if (node.left) { const l = getRoom(node.left); if (l) return l; }
+    if (node.right) return getRoom(node.right);
+    return undefined;
+  }
+
+  function getClosestRoom(node, px, py) {
+    let best, bestDist = Infinity;
+    function search(n) {
+      if (n.room) { const cx = n.room.x + n.room.width/2, cy = n.room.y + n.room.height/2; const d = Math.abs(cx-px)+Math.abs(cy-py); if (d < bestDist) { bestDist=d; best=n.room; } return; }
+      if (n.left) search(n.left); if (n.right) search(n.right);
+    }
+    search(node); return best;
+  }
+
+  function carveTile(x, y) {
+    for (let dy = 0; dy < corridorWidth; dy++) for (let dx = 0; dx < corridorWidth; dx++) {
+      const cx = x+dx, cy = y+dy;
+      if (cy >= 0 && cy < height && cx >= 0 && cx < width && tileMap[cy][cx] === 0) tileMap[cy][cx] = 2;
+    }
+  }
+
+  function isRoomEdge(x, y) {
+    for (const r of rooms) {
+      if ((x === r.x-1 || x === r.x+r.width) && y >= r.y && y < r.y+r.height) return true;
+      if ((y === r.y-1 || y === r.y+r.height) && x >= r.x && x < r.x+r.width) return true;
+    }
+    return false;
+  }
+
+  function connectNodes(node) {
+    if (!node.left || !node.right) return;
+    connectNodes(node.left); connectNodes(node.right);
+    const lr = getRoom(node.left), rr = getRoom(node.right);
+    if (!lr || !rr) return;
+    const lc = { x: Math.floor(lr.x+lr.width/2), y: Math.floor(lr.y+lr.height/2) };
+    const rc = { x: Math.floor(rr.x+rr.width/2), y: Math.floor(rr.y+rr.height/2) };
+    const al = getClosestRoom(node.left, rc.x, rc.y) || lr;
+    const ar = getClosestRoom(node.right, lc.x, lc.y) || rr;
+    const from = { x: Math.floor(al.x+al.width/2), y: Math.floor(al.y+al.height/2) };
+    const to = { x: Math.floor(ar.x+ar.width/2), y: Math.floor(ar.y+ar.height/2) };
+    const path = [];
+    let cx = from.x, cy = from.y;
+    if (rng() > 0.5) {
+      while (cx !== to.x) { path.push({x:cx,y:cy}); cx += cx < to.x ? 1 : -1; }
+      while (cy !== to.y) { path.push({x:cx,y:cy}); cy += cy < to.y ? 1 : -1; }
+    } else {
+      while (cy !== to.y) { path.push({x:cx,y:cy}); cy += cy < to.y ? 1 : -1; }
+      while (cx !== to.x) { path.push({x:cx,y:cy}); cx += cx < to.x ? 1 : -1; }
+    }
+    path.push({x:to.x,y:to.y});
+    for (const p of path) {
+      if (isRoomEdge(p.x, p.y) && rng() < doorChance) {
+        if (p.y >= 0 && p.y < height && p.x >= 0 && p.x < width && tileMap[p.y][p.x] === 0) tileMap[p.y][p.x] = 3;
+      } else carveTile(p.x, p.y);
+    }
+    if (!al.connections.includes(ar.id)) al.connections.push(ar.id);
+    if (!ar.connections.includes(al.id)) ar.connections.push(al.id);
+    corridors.push({ from: al.id, to: ar.id, path });
+  }
+  connectNodes(root);
+
+  // BFS connectivity fix
+  if (rooms.length > 1) {
+    const visited = new Set([rooms[0].id]);
+    const queue = [rooms[0].id];
+    while (queue.length) {
+      const cur = queue.shift();
+      const rm = rooms.find(r => r.id === cur);
+      if (!rm) continue;
+      for (const c of rm.connections) { if (!visited.has(c)) { visited.add(c); queue.push(c); } }
+    }
+    for (const rm of rooms) {
+      if (visited.has(rm.id)) continue;
+      let nearestId = -1, nearestDist = Infinity;
+      const rx = rm.x+rm.width/2, ry = rm.y+rm.height/2;
+      for (const vid of visited) {
+        const other = rooms.find(r => r.id === vid);
+        const dist = Math.abs(other.x+other.width/2-rx)+Math.abs(other.y+other.height/2-ry);
+        if (dist < nearestDist) { nearestDist=dist; nearestId=vid; }
+      }
+      if (nearestId >= 0) {
+        const other = rooms.find(r => r.id === nearestId);
+        const path = [];
+        let cx = Math.floor(rx), cy = Math.floor(ry);
+        const tx = Math.floor(other.x+other.width/2), ty = Math.floor(other.y+other.height/2);
+        while (cx !== tx) { path.push({x:cx,y:cy}); cx += cx < tx ? 1 : -1; }
+        while (cy !== ty) { path.push({x:cx,y:cy}); cy += cy < ty ? 1 : -1; }
+        path.push({x:tx,y:ty});
+        for (const p of path) carveTile(p.x, p.y);
+        rm.connections.push(nearestId); other.connections.push(rm.id);
+        visited.add(rm.id);
+      }
+    }
+  }
+  return { rooms, corridors, tileMap, width, height };
+}
+
+function autoFurnish(dungeon, seed) {
+  const rng = createRNG(seed + 999);
+  const result = new Map();
+  const templates = {
+    kitchen: [
+      { name:'Stove', w:2, h:1, rule:'wall' },
+      { name:'Sink', w:1, h:1, rule:'wall' },
+      { name:'Table', w:2, h:2, rule:'center' },
+      { name:'Chair', w:1, h:1, rule:'near-table' },
+      { name:'Barrel', w:1, h:1, rule:'corner' }
+    ],
+    bedroom: [
+      { name:'Bed', w:2, h:3, rule:'wall' },
+      { name:'Nightstand', w:1, h:1, rule:'near-bed' },
+      { name:'Wardrobe', w:2, h:1, rule:'wall' },
+      { name:'Desk', w:2, h:1, rule:'wall' }
+    ],
+    tavern: [
+      { name:'Bar', w:3, h:1, rule:'wall' },
+      { name:'Table', w:2, h:2, rule:'center' },
+      { name:'Table', w:2, h:2, rule:'center' },
+      { name:'Chair', w:1, h:1, rule:'near-table' },
+      { name:'Chair', w:1, h:1, rule:'near-table' },
+      { name:'Barrel', w:1, h:1, rule:'corner' }
+    ],
+    library: [
+      { name:'Shelf', w:2, h:1, rule:'wall' },
+      { name:'Shelf', w:2, h:1, rule:'wall' },
+      { name:'Shelf', w:2, h:1, rule:'wall' },
+      { name:'Desk', w:2, h:1, rule:'center' },
+      { name:'Chair', w:1, h:1, rule:'near-desk' }
+    ],
+    armory: [
+      { name:'Rack', w:2, h:1, rule:'wall' },
+      { name:'Rack', w:2, h:1, rule:'wall' },
+      { name:'Armor', w:1, h:1, rule:'wall' },
+      { name:'Chest', w:1, h:1, rule:'corner' }
+    ],
+    'dungeon-cell': [
+      { name:'Cot', w:2, h:1, rule:'corner' },
+      { name:'Bucket', w:1, h:1, rule:'corner' }
+    ],
+    storage: [
+      { name:'Crate', w:1, h:1, rule:'wall' },
+      { name:'Crate', w:1, h:1, rule:'wall' },
+      { name:'Barrel', w:1, h:1, rule:'wall' },
+      { name:'Sack', w:1, h:1, rule:'corner' }
+    ],
+    bathroom: [
+      { name:'Tub', w:2, h:1, rule:'wall' },
+      { name:'Basin', w:1, h:1, rule:'wall' }
+    ]
+  };
+
+  for (const room of dungeon.rooms) {
+    const type = room.type || 'bedroom';
+    const template = templates[type] || templates.bedroom;
+    const placed = [];
+    const occupied = new Set();
+
+    for (const obj of template) {
+      let bestX = -1, bestY = -1;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        let tx, ty;
+        if (obj.rule === 'wall') {
+          const side = randomInt(rng, 0, 3);
+          if (side === 0) { tx = randomInt(rng, room.x + 1, room.x + room.width - obj.w - 1); ty = room.y; }
+          else if (side === 1) { tx = randomInt(rng, room.x + 1, room.x + room.width - obj.w - 1); ty = room.y + room.height - obj.h; }
+          else if (side === 2) { tx = room.x; ty = randomInt(rng, room.y + 1, room.y + room.height - obj.h - 1); }
+          else { tx = room.x + room.width - obj.w; ty = randomInt(rng, room.y + 1, room.y + room.height - obj.h - 1); }
+        } else if (obj.rule === 'center') {
+          tx = randomInt(rng, room.x + 2, room.x + room.width - obj.w - 2);
+          ty = randomInt(rng, room.y + 2, room.y + room.height - obj.h - 2);
+        } else if (obj.rule === 'corner') {
+          const corners = [
+            { x: room.x, y: room.y },
+            { x: room.x + room.width - obj.w, y: room.y },
+            { x: room.x, y: room.y + room.height - obj.h },
+            { x: room.x + room.width - obj.w, y: room.y + room.height - obj.h }
+          ];
+          const c = corners[randomInt(rng, 0, 3)];
+          tx = c.x; ty = c.y;
+        } else {
+          tx = randomInt(rng, room.x + 1, room.x + room.width - obj.w - 1);
+          ty = randomInt(rng, room.y + 1, room.y + room.height - obj.h - 1);
+        }
+        // Check bounds
+        if (tx < room.x || ty < room.y || tx + obj.w > room.x + room.width || ty + obj.h > room.y + room.height) continue;
+        // Check overlap
+        let overlap = false;
+        for (let dy = 0; dy < obj.h; dy++) for (let dx = 0; dx < obj.w; dx++) {
+          if (occupied.has(`${tx+dx},${ty+dy}`)) { overlap = true; break; }
+          if (overlap) break;
+        }
+        if (!overlap) { bestX = tx; bestY = ty; break; }
+      }
+      if (bestX >= 0) {
+        for (let dy = 0; dy < obj.h; dy++) for (let dx = 0; dx < obj.w; dx++) occupied.add(`${bestX+dx},${bestY+dy}`);
+        placed.push({ ...obj, x: bestX, y: bestY });
+      }
+    }
+    result.set(room.id, placed);
+  }
+  return result;
+}
+
+// ============================================================
+// TAB 2: PATHFINDING
+// ============================================================
+function initPathfinding() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  let startPt = null, endPt = null, pathResult = null, flowData = null;
+  let showFlow = false, showJPS = false;
+
+  controlsDiv.innerHTML = `
+    <span style="font-size:12px;color:#71717a">Click two points on the dungeon to find a path</span>
+    <button class="btn secondary" id="pfClear">Clear Path</button>
+    <button class="btn secondary" id="pfFlow">Show Flow Field</button>
+    <button class="btn secondary" id="pfJPS">Compare JPS</button>
+    <span class="status" id="pfStatus">Generate a dungeon first</span>
+  `;
+
+  if (!dungeonData) {
+    dungeonData = generateDungeon(50, 40, { seed: 42, splitDepth: 5 });
+  }
+
+  function getMapCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+    const px = (e.clientX - rect.left) * scaleX, py = (e.clientY - rect.top) * scaleY;
+    const d = dungeonData;
+    const cs = Math.min(Math.floor((W-20)/d.width), Math.floor((H-20)/d.height));
+    const ox = Math.floor((W - d.width*cs)/2), oy = Math.floor((H - d.height*cs)/2);
+    const mx = Math.floor((px - ox) / cs), my = Math.floor((py - oy) / cs);
+    if (mx < 0 || my < 0 || mx >= d.width || my >= d.height) return null;
+    if (d.tileMap[my][mx] === 0) return null; // wall
+    return { x: mx, y: my };
+  }
+
+  canvas.onclick = (e) => {
+    const pt = getMapCoords(e);
+    if (!pt) return;
+    if (!startPt) { startPt = pt; endPt = null; pathResult = null; flowData = null; }
+    else { endPt = pt; runPathfinding(); }
+    draw();
+  };
+
+  function runPathfinding() {
+    if (!startPt || !endPt) return;
+    const d = dungeonData;
+    pathResult = astarFind(d, startPt.x, startPt.y, endPt.x, endPt.y);
+    if (showFlow && endPt) flowData = buildFlowField(d, endPt.x, endPt.y);
+    const status = document.getElementById('pfStatus');
+    if (pathResult.found) status.textContent = `Path: ${pathResult.path.length} nodes, cost: ${pathResult.cost.toFixed(1)}`;
+    else status.textContent = 'No path found';
+  }
+
+  document.getElementById('pfClear').onclick = () => { startPt = null; endPt = null; pathResult = null; flowData = null; draw(); };
+  document.getElementById('pfFlow').onclick = function() {
+    showFlow = !showFlow;
+    this.classList.toggle('active', showFlow);
+    if (showFlow && endPt) { flowData = buildFlowField(dungeonData, endPt.x, endPt.y); }
+    else flowData = null;
+    draw();
+  };
+  document.getElementById('pfJPS').onclick = function() {
+    showJPS = !showJPS;
+    this.classList.toggle('active', showJPS);
+    draw();
+  };
+
+  function draw() {
+    const d = dungeonData;
+    ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, W, H);
+    const cs = Math.min(Math.floor((W-20)/d.width), Math.floor((H-20)/d.height));
+    const ox = Math.floor((W - d.width*cs)/2), oy = Math.floor((H - d.height*cs)/2);
+
+    for (let y = 0; y < d.height; y++) for (let x = 0; x < d.width; x++) {
+      const t = d.tileMap[y][x];
+      ctx.fillStyle = t === 0 ? '#1a1a1a' : t === 1 ? '#2a2a3a' : t === 2 ? '#3d2b1a' : '#eab308';
+      ctx.fillRect(ox+x*cs, oy+y*cs, cs, cs);
+    }
+
+    // Flow field
+    if (showFlow && flowData) {
+      const dirDX = [0,1,1,1,0,-1,-1,-1,0], dirDY = [-1,-1,0,1,1,1,0,-1,0];
+      ctx.strokeStyle = '#3b82f666';
+      ctx.lineWidth = 1;
+      for (let y = 0; y < d.height; y++) for (let x = 0; x < d.width; x++) {
+        if (d.tileMap[y][x] === 0) continue;
+        const dir = flowData[y * d.width + x];
+        if (dir === 8) continue;
+        const cx = ox + x*cs + cs/2, cy = oy + y*cs + cs/2;
+        const dx = dirDX[dir], dy = dirDY[dir];
+        const len = cs * 0.35;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + dx*len, cy + dy*len);
+        ctx.stroke();
+        // arrowhead
+        const ax = cx + dx*len, ay = cy + dy*len;
+        ctx.fillStyle = '#3b82f666';
+        ctx.beginPath();
+        ctx.arc(ax, ay, 1.5, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // Path
+    if (pathResult && pathResult.found) {
+      ctx.fillStyle = '#facc1588';
+      for (const p of pathResult.path) ctx.fillRect(ox+p.x*cs+1, oy+p.y*cs+1, cs-2, cs-2);
+      // Draw path line
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < pathResult.path.length; i++) {
+        const p = pathResult.path[i];
+        const px = ox + p.x*cs + cs/2, py = oy + p.y*cs + cs/2;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    // Start/end markers
+    if (startPt) {
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath(); ctx.arc(ox+startPt.x*cs+cs/2, oy+startPt.y*cs+cs/2, cs/2.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('S', ox+startPt.x*cs+cs/2, oy+startPt.y*cs+cs/2+3);
+    }
+    if (endPt) {
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath(); ctx.arc(ox+endPt.x*cs+cs/2, oy+endPt.y*cs+cs/2, cs/2.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('E', ox+endPt.x*cs+cs/2, oy+endPt.y*cs+cs/2+3);
+    }
+  }
+
+  draw();
+}
+
+function astarFind(dungeon, sx, sy, ex, ey) {
+  const w = dungeon.width, h = dungeon.height, total = w*h;
+  if (sx===ex && sy===ey) return { path:[{x:sx,y:sy}], cost:0, found:true };
+  const gScore = new Float32Array(total).fill(Infinity);
+  const fScore = new Float32Array(total).fill(Infinity);
+  const closed = new Uint8Array(total);
+  const parent = new Int32Array(total).fill(-1);
+  const sIdx = sy*w+sx, eIdx = ey*w+ex;
+  gScore[sIdx] = 0;
+  fScore[sIdx] = Math.abs(sx-ex)+Math.abs(sy-ey);
+  // Simple open list (could use heap but maps are small)
+  const open = new Set([sIdx]);
+  let iter = 0;
+  while (open.size > 0 && iter < 20000) {
+    iter++;
+    let bestIdx = -1, bestF = Infinity;
+    for (const idx of open) { if (fScore[idx] < bestF) { bestF=fScore[idx]; bestIdx=idx; } }
+    if (bestIdx === eIdx) {
+      const path = [];
+      let idx = eIdx;
+      while (idx !== -1) { path.push({x:idx%w,y:Math.floor(idx/w)}); if (idx===sIdx) break; idx=parent[idx]; if (path.length > total) break; }
+      path.reverse();
+      return { path, cost:gScore[eIdx], found:true };
+    }
+    open.delete(bestIdx);
+    closed[bestIdx] = 1;
+    const cx = bestIdx%w, cy = Math.floor(bestIdx/w);
+    const dirs = [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1],[-1,1],[1,1]];
+    for (const [dx,dy] of dirs) {
+      const nx=cx+dx, ny=cy+dy;
+      if (nx<0||ny<0||nx>=w||ny>=h) continue;
+      if (dungeon.tileMap[ny][nx]===0) continue;
+      const nIdx=ny*w+nx;
+      if (closed[nIdx]) continue;
+      const cost = (dx!==0&&dy!==0) ? 1.414 : 1;
+      const tg = gScore[bestIdx]+cost;
+      if (tg < gScore[nIdx]) {
+        parent[nIdx]=bestIdx; gScore[nIdx]=tg;
+        fScore[nIdx]=tg+Math.abs(nx-ex)+Math.abs(ny-ey);
+        open.add(nIdx);
+      }
+    }
+  }
+  return { path:[], cost:0, found:false };
+}
+
+function buildFlowField(dungeon, tx, ty) {
+  const w=dungeon.width, h=dungeon.height, total=w*h;
+  const cost = new Float32Array(total).fill(Infinity);
+  const field = new Int8Array(total).fill(8);
+  cost[ty*w+tx] = 0;
+  const queue = [ty*w+tx];
+  let qi = 0;
+  const DX=[0,1,1,1,0,-1,-1,-1], DY=[-1,-1,0,1,1,1,0,-1];
+  while (qi < queue.length) {
+    const idx = queue[qi++];
+    const cx=idx%w, cy=Math.floor(idx/w);
+    for (let d=0;d<8;d++) {
+      const nx=cx+DX[d], ny=cy+DY[d];
+      if (nx<0||ny<0||nx>=w||ny>=h) continue;
+      if (dungeon.tileMap[ny][nx]===0) continue;
+      const nIdx=ny*w+nx;
+      const mc = (d%2===0)?1:1.414;
+      const nc = cost[idx]+mc;
+      if (nc < cost[nIdx]) { cost[nIdx]=nc; queue.push(nIdx); }
+    }
+  }
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++) {
+    const idx=y*w+x;
+    if (cost[idx]===Infinity) continue;
+    if (x===tx&&y===ty) { field[idx]=8; continue; }
+    let bestC=Infinity, bestD=8;
+    for (let d=0;d<8;d++) {
+      const nx=x+DX[d], ny=y+DY[d];
+      if (nx<0||ny<0||nx>=w||ny>=h) continue;
+      const nIdx=ny*w+nx;
+      if (cost[nIdx]<bestC) { bestC=cost[nIdx]; bestD=d; }
+    }
+    field[idx]=bestD;
+  }
+  return field;
+}
+
+// ============================================================
+// TAB 3: PARTICLES
+// ============================================================
+function initParticles() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const MAX = 2000;
+  const pool = [];
+  for (let i=0;i<MAX;i++) pool.push({active:false,x:0,y:0,vx:0,vy:0,life:0,maxLife:1,size:3,r:255,g:255,b:255,alpha:1,sr:0,sg:0,sb:0,er:0,eg:0,eb:0,startSize:3,endSize:1,startAlpha:1,endAlpha:0});
+  const emitters = [];
+  let gravity = 0, curPreset = 'fire';
+
+  const presets = {
+    fire: { count:60, speed:[40,80], angle:[-110,-70], gravity:-20, life:[0.4,1.0], startSize:[10,18], endSize:[2,4], sc:0xff8800, ec:0xcc2200, sa:0.9, ea:0, blend:'lighter' },
+    smoke: { count:30, speed:[15,35], angle:[-100,-80], gravity:-10, life:[1.5,3], startSize:[12,20], endSize:[30,50], sc:0x888888, ec:0x444444, sa:0.35, ea:0, blend:'source-over' },
+    rain: { count:120, speed:[400,600], angle:[80,95], gravity:0, life:[0.3,0.6], startSize:[2,3], endSize:[2,3], sc:0xaaccff, ec:0xaaccff, sa:0.7, ea:0.3, blend:'lighter', spawnW:W, spawnH:5, spawnOY:-10 },
+    snow: { count:100, speed:[20,50], angle:[70,110], gravity:10, life:[3,6], startSize:[2,5], endSize:[2,5], sc:0xffffff, ec:0xffffff, sa:0.8, ea:0.2, blend:'source-over', spawnW:W, spawnH:5, spawnOY:-10 },
+    sparkle: { count:50, speed:[80,200], angle:[0,360], gravity:0, life:[0.2,0.6], startSize:[2,5], endSize:[0,1], sc:0xffff88, ec:0xffffff, sa:1, ea:0, blend:'lighter' },
+    dust: { count:20, speed:[5,15], angle:[0,360], gravity:0, life:[2,5], startSize:[3,7], endSize:[3,7], sc:0xc4a56e, ec:0x8b7355, sa:0.15, ea:0, blend:'source-over', spawnW:300, spawnH:200 },
+    explosion: { count:0, burstCount:60, speed:[100,300], angle:[0,360], gravity:0, life:[0.4,1.2], startSize:[6,14], endSize:[1,3], sc:0xff8800, ec:0x666666, sa:1, ea:0, blend:'lighter', damping:0.6 },
+    bubbles: { count:15, speed:[20,50], angle:[-100,-80], gravity:-15, life:[2,4], startSize:[4,8], endSize:[6,12], sc:0x88ccff, ec:0xaaddff, sa:0.6, ea:0.1, blend:'source-over' }
+  };
+
+  controlsDiv.innerHTML = `
+    <button class="btn active" data-p="fire">Fire</button>
+    <button class="btn secondary" data-p="smoke">Smoke</button>
+    <button class="btn secondary" data-p="rain">Rain</button>
+    <button class="btn secondary" data-p="snow">Snow</button>
+    <button class="btn secondary" data-p="sparkle">Sparkle</button>
+    <button class="btn secondary" data-p="dust">Dust</button>
+    <button class="btn secondary" data-p="explosion">Explosion</button>
+    <button class="btn secondary" data-p="bubbles">Bubbles</button>
+    <button class="btn secondary" id="pClear">Clear All</button>
+    <span class="status" id="pStatus">Click canvas to place emitter</span>
+  `;
+
+  controlsDiv.querySelectorAll('[data-p]').forEach(btn => {
+    btn.onclick = () => {
+      controlsDiv.querySelectorAll('[data-p]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (!btn.classList.contains('secondary')) btn.classList.add('active');
+      else { btn.classList.remove('secondary'); btn.classList.add('active'); }
+      controlsDiv.querySelectorAll('[data-p]').forEach(b => { if(b!==btn) { b.classList.remove('active'); b.classList.add('secondary'); }});
+      curPreset = btn.dataset.p;
+    };
+  });
+
+  document.getElementById('pClear').onclick = () => { emitters.length = 0; for (const p of pool) p.active = false; };
+
+  canvas.onclick = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (W / rect.width);
+    const y = (e.clientY - rect.top) * (H / rect.height);
+    const preset = presets[curPreset];
+    const em = { x, y, preset: { ...preset }, timer: 0, alive: true };
+    if (preset.burstCount) {
+      // Burst emitter: emit all at once
+      for (let i = 0; i < preset.burstCount; i++) emitParticle(em);
+    }
+    emitters.push(em);
+  };
+
+  function emitParticle(em) {
+    const p = pool.find(p => !p.active);
+    if (!p) return;
+    const pr = em.preset;
+    const DEG = Math.PI / 180;
+    const angle = randomFloat(Math.random, pr.angle[0]*DEG, pr.angle[1]*DEG);
+    const speed = randomFloat(Math.random, pr.speed[0], pr.speed[1]);
+    p.active = true;
+    p.x = em.x + (pr.spawnW ? (Math.random()-0.5)*pr.spawnW : 0) + (pr.spawnOY ? 0 : 0);
+    p.y = em.y + (pr.spawnH ? (Math.random()-0.5)*pr.spawnH : 0) + (pr.spawnOY || 0);
+    p.vx = Math.cos(angle) * speed;
+    p.vy = Math.sin(angle) * speed;
+    p.maxLife = randomFloat(Math.random, pr.life[0], pr.life[1]);
+    p.life = 0;
+    const sc = hexToRgb(pr.sc), ec = hexToRgb(pr.ec);
+    p.sr = sc.r; p.sg = sc.g; p.sb = sc.b;
+    p.er = ec.r; p.eg = ec.g; p.eb = ec.b;
+    p.startSize = randomFloat(Math.random, pr.startSize[0], pr.startSize[1]);
+    p.endSize = randomFloat(Math.random, pr.endSize[0], pr.endSize[1]);
+    p.startAlpha = pr.sa; p.endAlpha = pr.ea;
+    p.size = p.startSize; p.alpha = p.startAlpha;
+    p.damping = pr.damping || 0;
+  }
+
+  let lastTime = performance.now();
+  function update() {
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+
+    // Emit from active emitters
+    for (const em of emitters) {
+      if (!em.alive) continue;
+      const pr = em.preset;
+      if (pr.count <= 0) continue; // burst-only
+      em.timer += dt;
+      const interval = 1 / pr.count;
+      while (em.timer >= interval) { em.timer -= interval; emitParticle(em); }
+    }
+
+    // Update particles
+    for (const p of pool) {
+      if (!p.active) continue;
+      p.life += dt;
+      if (p.life >= p.maxLife) { p.active = false; continue; }
+      const t = p.life / p.maxLife;
+      // Find gravity from emitter
+      let grav = 0;
+      for (const em of emitters) { grav = em.preset.gravity || 0; break; }
+      p.vy += grav * dt;
+      if (p.damping) { p.vx *= (1 - p.damping * dt); p.vy *= (1 - p.damping * dt); }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.size = p.startSize + (p.endSize - p.startSize) * t;
+      p.alpha = p.startAlpha + (p.endAlpha - p.startAlpha) * t;
+      p.r = p.sr + (p.er - p.sr) * t;
+      p.g = p.sg + (p.eg - p.sg) * t;
+      p.b = p.sb + (p.eb - p.sb) * t;
+    }
+
+    // Draw
+    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
+    // Draw emitter positions
+    for (const em of emitters) {
+      ctx.fillStyle = '#ffffff22';
+      ctx.beginPath(); ctx.arc(em.x, em.y, 4, 0, Math.PI*2); ctx.fill();
+    }
+    // Determine blend
+    const blend = emitters.length > 0 ? (emitters[emitters.length-1].preset.blend || 'source-over') : 'source-over';
+    ctx.globalCompositeOperation = blend;
+    let activeCount = 0;
+    for (const p of pool) {
+      if (!p.active) continue;
+      activeCount++;
+      ctx.fillStyle = rgbStr(p.r, p.g, p.b, p.alpha);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(0.5, p.size/2), 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    const status = document.getElementById('pStatus');
+    if (status) status.textContent = `Particles: ${activeCount} | Emitters: ${emitters.length}`;
+
+    animFrame = requestAnimationFrame(update);
+  }
+  update();
+  activeCleanup = () => { cancelAnimationFrame(animFrame); animFrame = null; };
+}
+
+// ============================================================
+// TAB 4: LIGHTING
+// ============================================================
+function initLighting() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const lights = [];
+  const walls = [];
+  let ambientColor = '#222233', ambientIntensity = 0.3;
+  let lightColor = '#ffaa44', lightRadius = 150;
+  let dayNight = false, dayTime = 0;
+  let addWallMode = false, wallStart = null;
+  let dragging = null;
+
+  controlsDiv.innerHTML = `
+    <label>Ambient <input type="color" id="lAmb" value="#222233"></label>
+    <label>Intensity <input type="range" id="lAmbI" min="0" max="100" value="30"><span id="lAmbIv">0.3</span></label>
+    <label>Light Color <input type="color" id="lCol" value="#ffaa44"></label>
+    <label>Radius <input type="range" id="lRad" min="50" max="400" value="150"><span id="lRadv">150</span></label>
+    <button class="btn secondary" id="lDN">Day/Night Cycle</button>
+    <button class="btn secondary" id="lWall">Add Wall</button>
+    <button class="btn secondary" id="lClear">Clear All</button>
+    <span class="status" id="lStatus">Click to place lights, drag to move</span>
+  `;
+
+  const sE = id => document.getElementById(id);
+  sE('lAmb').oninput = function() { ambientColor = this.value; };
+  sE('lAmbI').oninput = function() { ambientIntensity = this.value/100; sE('lAmbIv').textContent = ambientIntensity.toFixed(2); };
+  sE('lCol').oninput = function() { lightColor = this.value; };
+  sE('lRad').oninput = function() { lightRadius = +this.value; sE('lRadv').textContent = this.value; };
+  sE('lDN').onclick = function() { dayNight = !dayNight; this.classList.toggle('active', dayNight); };
+  sE('lWall').onclick = function() { addWallMode = !addWallMode; this.classList.toggle('active', addWallMode); };
+  sE('lClear').onclick = () => { lights.length = 0; walls.length = 0; };
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * (W/rect.width), y: (e.clientY - rect.top) * (H/rect.height) };
+  }
+
+  canvas.onmousedown = (e) => {
+    const pos = getPos(e);
+    if (addWallMode) { wallStart = pos; return; }
+    // Check if clicking existing light
+    for (const l of lights) {
+      const dx = l.x - pos.x, dy = l.y - pos.y;
+      if (dx*dx+dy*dy < 400) { dragging = l; return; }
+    }
+    lights.push({ x: pos.x, y: pos.y, color: lightColor, radius: lightRadius });
+  };
+
+  canvas.onmousemove = (e) => {
+    if (dragging) { const pos = getPos(e); dragging.x = pos.x; dragging.y = pos.y; }
+  };
+
+  canvas.onmouseup = (e) => {
+    if (addWallMode && wallStart) {
+      const pos = getPos(e);
+      const x = Math.min(wallStart.x, pos.x), y = Math.min(wallStart.y, pos.y);
+      const w = Math.abs(pos.x - wallStart.x), h = Math.abs(pos.y - wallStart.y);
+      if (w > 5 && h > 5) walls.push({ x, y, width: w, height: h });
+      wallStart = null;
+    }
+    dragging = null;
+  };
+
+  // Add some default walls
+  walls.push({ x: 200, y: 150, width: 80, height: 20 });
+  walls.push({ x: 400, y: 250, width: 20, height: 100 });
+  walls.push({ x: 150, y: 350, width: 120, height: 20 });
+
+  // Add a default light
+  lights.push({ x: 360, y: 260, color: '#ffaa44', radius: 180 });
+
+  const dnColors = {
+    night: { color: '#0a0a22', intensity: 0.15 },
+    dawn: { color: '#664433', intensity: 0.5 },
+    noon: { color: '#eeeecc', intensity: 0.95 },
+    dusk: { color: '#663322', intensity: 0.45 }
+  };
+
+  let lastT = performance.now();
+  function update() {
+    const now = performance.now(), dt = (now - lastT) / 1000;
+    lastT = now;
+
+    if (dayNight) {
+      dayTime = (dayTime + dt * 0.05) % 1;
+    }
+
+    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
+
+    // Draw tiled floor
+    ctx.fillStyle = '#181820';
+    for (let y = 0; y < H; y += 32) for (let x = 0; x < W; x += 32) {
+      ctx.fillStyle = ((x/32+y/32)%2===0) ? '#181820' : '#1a1a28';
+      ctx.fillRect(x, y, 32, 32);
+    }
+
+    // Draw walls
+    ctx.fillStyle = '#333340';
+    for (const w of walls) ctx.fillRect(w.x, w.y, w.width, w.height);
+
+    // Create lightmap
+    const lm = document.createElement('canvas');
+    lm.width = W; lm.height = H;
+    const lc = lm.getContext('2d');
+
+    // Ambient fill
+    let ambHex = ambientColor;
+    let ambI = ambientIntensity;
+    if (dayNight) {
+      const t = dayTime;
+      let c1, c2, f;
+      if (t < 0.25) { c1 = dnColors.night; c2 = dnColors.dawn; f = t/0.25; }
+      else if (t < 0.5) { c1 = dnColors.dawn; c2 = dnColors.noon; f = (t-0.25)/0.25; }
+      else if (t < 0.75) { c1 = dnColors.noon; c2 = dnColors.dusk; f = (t-0.5)/0.25; }
+      else { c1 = dnColors.dusk; c2 = dnColors.night; f = (t-0.75)/0.25; }
+      ambI = c1.intensity + (c2.intensity - c1.intensity) * f;
+      ambHex = c1.color; // simplified
+    }
+    lc.fillStyle = ambHex;
+    lc.globalAlpha = ambI;
+    lc.fillRect(0, 0, W, H);
+    lc.globalAlpha = 1;
+
+    // Draw lights (additive)
+    lc.globalCompositeOperation = 'lighter';
+    for (const light of lights) {
+      const grad = lc.createRadialGradient(light.x, light.y, 0, light.x, light.y, light.radius);
+      grad.addColorStop(0, light.color + 'cc');
+      grad.addColorStop(0.3, light.color + '88');
+      grad.addColorStop(1, light.color + '00');
+      lc.fillStyle = grad;
+      lc.beginPath();
+      lc.arc(light.x, light.y, light.radius, 0, Math.PI*2);
+      lc.fill();
+
+      // Cast shadows from walls
+      for (const wall of walls) {
+        const corners = [
+          { x: wall.x, y: wall.y },
+          { x: wall.x + wall.width, y: wall.y },
+          { x: wall.x + wall.width, y: wall.y + wall.height },
+          { x: wall.x, y: wall.y + wall.height }
+        ];
+        const withAngle = corners.map(c => ({ ...c, a: Math.atan2(c.y - light.y, c.x - light.x) }));
+        withAngle.sort((a, b) => a.a - b.a);
+        const left = withAngle[0], right = withAngle[withAngle.length - 1];
+        const shadowLen = light.radius * 1.5;
+        const project = (px, py) => {
+          const dx = px - light.x, dy = py - light.y;
+          const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+          return { x: px + (dx/dist)*shadowLen, y: py + (dy/dist)*shadowLen };
+        };
+        const pL = project(left.x, left.y), pR = project(right.x, right.y);
+        lc.globalCompositeOperation = 'destination-out';
+        lc.fillStyle = 'rgba(0,0,0,0.7)';
+        lc.beginPath();
+        lc.moveTo(left.x, left.y);
+        lc.lineTo(pL.x, pL.y);
+        lc.lineTo(pR.x, pR.y);
+        lc.lineTo(right.x, right.y);
+        lc.closePath();
+        lc.fill();
+        lc.globalCompositeOperation = 'lighter';
+      }
+    }
+
+    // Composite lightmap
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(lm, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Draw light positions (on top)
+    for (const light of lights) {
+      ctx.fillStyle = light.color;
+      ctx.beginPath();
+      ctx.arc(light.x, light.y, 5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff3';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(light.x, light.y, light.radius, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    // Draw wall outlines on top
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    for (const w of walls) ctx.strokeRect(w.x, w.y, w.width, w.height);
+
+    // Day/night indicator
+    if (dayNight) {
+      ctx.fillStyle = '#fff8';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'left';
+      const timeLabel = dayTime < 0.25 ? 'Night->Dawn' : dayTime < 0.5 ? 'Dawn->Noon' : dayTime < 0.75 ? 'Noon->Dusk' : 'Dusk->Night';
+      ctx.fillText(`Time: ${(dayTime*24).toFixed(1)}h (${timeLabel})`, 10, 20);
+    }
+
+    animFrame = requestAnimationFrame(update);
+  }
+  update();
+  activeCleanup = () => { cancelAnimationFrame(animFrame); animFrame = null; };
+}
+
+// ============================================================
+// TAB 5: ANIMATION + TWEEN
+// ============================================================
+function initAnimation() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const Easing = {
+    linear: t => t,
+    easeInQuad: t => t*t,
+    easeOutQuad: t => t*(2-t),
+    easeInOutQuad: t => t<0.5 ? 2*t*t : -1+(4-2*t)*t,
+    easeInCubic: t => t*t*t,
+    easeOutCubic: t => { const t1=t-1; return t1*t1*t1+1; },
+    easeInOutCubic: t => t<0.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2)+1,
+    easeInBack: t => { const s=1.70158; return t*t*((s+1)*t-s); },
+    easeOutBack: t => { const s=1.70158; const t1=t-1; return t1*t1*((s+1)*t1+s)+1; },
+    easeOutBounce: t => { if(t<1/2.75) return 7.5625*t*t; if(t<2/2.75){const t1=t-1.5/2.75;return 7.5625*t1*t1+0.75;} if(t<2.5/2.75){const t1=t-2.25/2.75;return 7.5625*t1*t1+0.9375;} const t1=t-2.625/2.75;return 7.5625*t1*t1+0.984375; },
+    easeOutElastic: t => { if(t===0||t===1)return t; return Math.pow(2,-10*t)*Math.sin((t-0.075)*(2*Math.PI)/0.3)+1; }
+  };
+
+  const squares = [];
+  const colors = ['#3b82f6','#22c55e','#ef4444','#eab308','#a855f7'];
+  for (let i = 0; i < 5; i++) {
+    squares.push({ x: 80 + i * 120, y: 200, baseX: 80 + i * 120, baseY: 200, size: 40, color: colors[i], angle: 0 });
+  }
+
+  const tweens = [];
+  let speed = 1;
+  let curEasing = 'easeOutBounce';
+  let spriteFrame = 0, spriteTimer = 0;
+
+  controlsDiv.innerHTML = `
+    <button class="btn" data-e="easeOutBounce">Bounce</button>
+    <button class="btn secondary" data-e="easeOutElastic">Elastic</button>
+    <button class="btn secondary" data-e="easeOutBack">Back</button>
+    <button class="btn secondary" data-e="easeInOutCubic">Cubic</button>
+    <button class="btn secondary" data-e="easeOutQuad">Quad</button>
+    <button class="btn secondary" data-e="linear">Linear</button>
+    <button class="btn secondary" id="aReset">Reset</button>
+    <label>Speed <input type="range" id="aSpeed" min="1" max="30" value="10"><span id="aSv">1.0</span></label>
+    <span class="status" id="aStatus"></span>
+  `;
+
+  controlsDiv.querySelectorAll('[data-e]').forEach(btn => {
+    btn.onclick = () => {
+      controlsDiv.querySelectorAll('[data-e]').forEach(b => { b.classList.remove('active'); b.classList.add('secondary'); });
+      btn.classList.remove('secondary'); btn.classList.add('active');
+      curEasing = btn.dataset.e;
+      triggerTween();
+    };
+  });
+
+  document.getElementById('aReset').onclick = () => {
+    tweens.length = 0;
+    squares.forEach(s => { s.x = s.baseX; s.y = s.baseY; s.angle = 0; });
+  };
+
+  document.getElementById('aSpeed').oninput = function() { speed = this.value / 10; document.getElementById('aSv').textContent = speed.toFixed(1); };
+
+  function triggerTween() {
+    tweens.length = 0;
+    for (let i = 0; i < squares.length; i++) {
+      const s = squares[i];
+      s.x = s.baseX; s.y = 200;
+      const tween = {
+        target: s,
+        from: { y: 200 },
+        to: { y: 80 + Math.random() * 60 },
+        duration: 1 + i * 0.2,
+        elapsed: 0,
+        easing: Easing[curEasing] || Easing.linear,
+        done: false
+      };
+      tweens.push(tween);
+    }
+  }
+
+  let lastT = performance.now();
+  function update() {
+    const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.05) * speed;
+    lastT = now;
+
+    // Update tweens
+    for (const tw of tweens) {
+      if (tw.done) continue;
+      tw.elapsed += dt;
+      const t = Math.min(tw.elapsed / tw.duration, 1);
+      const et = tw.easing(t);
+      for (const key in tw.from) {
+        tw.target[key] = tw.from[key] + (tw.to[key] - tw.from[key]) * et;
+      }
+      if (t >= 1) tw.done = true;
+    }
+
+    // Sprite animation timer
+    spriteTimer += dt;
+    if (spriteTimer > 0.12) { spriteTimer = 0; spriteFrame = (spriteFrame + 1) % 8; }
+
+    // Draw
+    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
+
+    // Draw squares
+    for (const s of squares) {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(s.x - s.size/2, s.y - s.size/2, s.size, s.size);
+      ctx.strokeStyle = '#fff2';
+      ctx.strokeRect(s.x - s.size/2, s.y - s.size/2, s.size, s.size);
+    }
+
+    // Draw easing curves
+    const easingNames = Object.keys(Easing);
+    const graphW = 55, graphH = 40, startX = 20, startY = 320;
+    const cols = 6;
+    for (let i = 0; i < easingNames.length; i++) {
+      const name = easingNames[i];
+      const fn = Easing[name];
+      const gx = startX + (i % cols) * (graphW + 16);
+      const gy = startY + Math.floor(i / cols) * (graphH + 28);
+
+      // Background
+      ctx.fillStyle = '#151520';
+      ctx.fillRect(gx, gy, graphW, graphH);
+      ctx.strokeStyle = name === curEasing ? '#3b82f6' : '#333';
+      ctx.lineWidth = name === curEasing ? 2 : 1;
+      ctx.strokeRect(gx, gy, graphW, graphH);
+
+      // Curve
+      ctx.strokeStyle = name === curEasing ? '#3b82f6' : '#666';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let t = 0; t <= 1; t += 0.02) {
+        const px = gx + t * graphW;
+        const py = gy + graphH - fn(t) * graphH;
+        if (t === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = name === curEasing ? '#3b82f6' : '#666';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(name.replace('ease',''), gx + graphW/2, gy + graphH + 10);
+    }
+
+    // Sprite animation mock
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Sprite Animation:', 430, 310);
+    const spriteColors = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e74c3c'];
+    for (let i = 0; i < 8; i++) {
+      const sx = 430 + i * 34, sy = 320;
+      ctx.fillStyle = i === spriteFrame ? spriteColors[i] : '#333';
+      ctx.fillRect(sx, sy, 30, 30);
+      if (i === spriteFrame) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sx, sy, 30, 30);
+        // Draw a simple character shape
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(sx + 15, sy + 10, 5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillRect(sx + 12, sy + 16, 6, 10);
+      }
+      ctx.fillStyle = '#555';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(i, sx+15, sy+42);
+    }
+
+    // Frame indicator
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText('Frame ' + spriteFrame, 430 + spriteFrame * 34 + 15, sy + 55);
+
+    animFrame = requestAnimationFrame(update);
+  }
+
+  const sy = 320; // for sprite indicator
+  triggerTween();
+  update();
+  activeCleanup = () => { cancelAnimationFrame(animFrame); animFrame = null; };
+}
+
+// ============================================================
+// TAB 6: WAVE FUNCTION COLLAPSE
+// ============================================================
+function initWFC() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  let gridSize = 15, tileSet = 'pipes', solving = false, stepTimer = null;
+  let wfcGrid = null, wfcWave = null, wfcTiles = null, wfcSolved = false;
+
+  const tileSets = {
+    pipes: [
+      { id:0, name:'Empty', color:'#1a1a2e', edges:['e','e','e','e'], weight:3 },
+      { id:1, name:'H-Pipe', color:'#3b82f6', edges:['e','p','e','p'], weight:2, draw:'h' },
+      { id:2, name:'V-Pipe', color:'#3b82f6', edges:['p','e','p','e'], weight:2, draw:'v' },
+      { id:3, name:'Corner-NE', color:'#22c55e', edges:['p','p','e','e'], weight:1, draw:'ne' },
+      { id:4, name:'Corner-SE', color:'#22c55e', edges:['e','p','p','e'], weight:1, draw:'se' },
+      { id:5, name:'Corner-SW', color:'#22c55e', edges:['e','e','p','p'], weight:1, draw:'sw' },
+      { id:6, name:'Corner-NW', color:'#22c55e', edges:['p','e','e','p'], weight:1, draw:'nw' },
+      { id:7, name:'Cross', color:'#eab308', edges:['p','p','p','p'], weight:0.5, draw:'cross' },
+      { id:8, name:'T-Down', color:'#a855f7', edges:['e','p','p','p'], weight:0.8, draw:'td' },
+      { id:9, name:'T-Up', color:'#a855f7', edges:['p','p','e','p'], weight:0.8, draw:'tu' },
+      { id:10, name:'T-Left', color:'#a855f7', edges:['p','e','p','p'], weight:0.8, draw:'tl' },
+      { id:11, name:'T-Right', color:'#a855f7', edges:['p','p','p','e'], weight:0.8, draw:'tr' },
+    ],
+    terrain: [
+      { id:0, name:'Grass', color:'#22c55e', edges:['g','g','g','g'], weight:4 },
+      { id:1, name:'Water', color:'#3b82f6', edges:['w','w','w','w'], weight:3 },
+      { id:2, name:'Sand', color:'#eab308', edges:['s','s','s','s'], weight:2 },
+      { id:3, name:'G-W Top', color:'#1e8a4e', edges:['g','g','w','g'], weight:1 },
+      { id:4, name:'G-W Bot', color:'#1e8a4e', edges:['w','g','g','g'], weight:1 },
+      { id:5, name:'G-W Left', color:'#1e8a4e', edges:['g','g','g','w'], weight:1 },
+      { id:6, name:'G-W Right', color:'#1e8a4e', edges:['g','w','g','g'], weight:1 },
+      { id:7, name:'G-S Top', color:'#a5b73a', edges:['g','g','s','g'], weight:1 },
+      { id:8, name:'G-S Bot', color:'#a5b73a', edges:['s','g','g','g'], weight:1 },
+      { id:9, name:'S-W Top', color:'#c49a22', edges:['s','s','w','s'], weight:1 },
+      { id:10, name:'S-W Bot', color:'#c49a22', edges:['w','s','s','s'], weight:1 },
+    ],
+    dungeon: [
+      { id:0, name:'Wall', color:'#1a1a1a', edges:['w','w','w','w'], weight:3 },
+      { id:1, name:'Floor', color:'#2a2a3a', edges:['f','f','f','f'], weight:2 },
+      { id:2, name:'H-Corr', color:'#3d2b1a', edges:['w','f','w','f'], weight:1 },
+      { id:3, name:'V-Corr', color:'#3d2b1a', edges:['f','w','f','w'], weight:1 },
+      { id:4, name:'Corner-NE', color:'#2a2a3a', edges:['f','f','w','w'], weight:0.8 },
+      { id:5, name:'Corner-SE', color:'#2a2a3a', edges:['w','f','f','w'], weight:0.8 },
+      { id:6, name:'Corner-SW', color:'#2a2a3a', edges:['w','w','f','f'], weight:0.8 },
+      { id:7, name:'Corner-NW', color:'#2a2a3a', edges:['f','w','w','f'], weight:0.8 },
+      { id:8, name:'Cross', color:'#2a2a3a', edges:['f','f','f','f'], weight:0.3 },
+    ]
+  };
+
+  controlsDiv.innerHTML = `
+    <label>Grid <input type="range" id="wSize" min="8" max="30" value="15"><span id="wSv">15</span></label>
+    <label>Tiles <select id="wSet"><option value="pipes">Pipes</option><option value="terrain">Terrain</option><option value="dungeon">Dungeon</option></select></label>
+    <button class="btn" id="wSolve">Solve (Animated)</button>
+    <button class="btn secondary" id="wInstant">Solve (Instant)</button>
+    <button class="btn secondary" id="wClear">Clear</button>
+    <span class="status" id="wStatus"></span>
+  `;
+
+  const sE = id => document.getElementById(id);
+  sE('wSize').oninput = function() { gridSize = +this.value; sE('wSv').textContent = this.value; };
+  sE('wSet').onchange = function() { tileSet = this.value; };
+  sE('wSolve').onclick = () => startWFC(true);
+  sE('wInstant').onclick = () => startWFC(false);
+  sE('wClear').onclick = () => { clearWFC(); draw(); };
+
+  function clearWFC() {
+    if (stepTimer) { clearTimeout(stepTimer); stepTimer = null; }
+    wfcGrid = null; wfcWave = null; wfcSolved = false; solving = false;
+  }
+
+  function startWFC(animated) {
+    clearWFC();
+    const tiles = tileSets[tileSet];
+    wfcTiles = tiles;
+    const tc = tiles.length;
+    const total = gridSize * gridSize;
+    const OPPOSITE = [2, 3, 0, 1];
+    const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+
+    // Precompute compatibility
+    const compatible = [];
+    for (let dir = 0; dir < 4; dir++) {
+      compatible[dir] = [];
+      for (let i = 0; i < tc; i++) {
+        compatible[dir][i] = new Set();
+        const myEdge = tiles[i].edges[dir];
+        const oppDir = OPPOSITE[dir];
+        for (let j = 0; j < tc; j++) {
+          if (tiles[j].edges[oppDir] === myEdge) compatible[dir][i].add(j);
+        }
+      }
+    }
+
+    const weights = tiles.map(t => t.weight ?? 1);
+    const rng = createRNG(Date.now());
+    const wave = [];
+    const possibleCount = [];
+    for (let i = 0; i < total; i++) {
+      wave[i] = new Array(tc).fill(true);
+      possibleCount[i] = tc;
+    }
+    wfcWave = wave;
+
+    function entropy(ci) {
+      if (possibleCount[ci] <= 1) return 0;
+      let sumW = 0, sumWLogW = 0;
+      for (let t = 0; t < tc; t++) { if (wave[ci][t]) { const w = weights[t]; sumW += w; sumWLogW += w * Math.log(w); } }
+      if (sumW <= 0) return 0;
+      return Math.log(sumW) - sumWLogW / sumW;
+    }
+
+    function propagate(startCell) {
+      const stack = [startCell];
+      const visited = new Set();
+      while (stack.length > 0) {
+        const cell = stack.pop();
+        if (visited.has(cell)) continue;
+        visited.add(cell);
+        const cx = cell % gridSize, cy = Math.floor(cell / gridSize);
+        for (let dir = 0; dir < 4; dir++) {
+          const nx = cx + DX[dir], ny = cy + DY[dir];
+          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) continue;
+          const ni = ny * gridSize + nx;
+          if (possibleCount[ni] <= 1) continue;
+          let changed = false;
+          for (let nt = 0; nt < tc; nt++) {
+            if (!wave[ni][nt]) continue;
+            let hasCompat = false;
+            for (let ct = 0; ct < tc; ct++) {
+              if (!wave[cell][ct]) continue;
+              if (compatible[dir][ct].has(nt)) { hasCompat = true; break; }
+            }
+            if (!hasCompat) { wave[ni][nt] = false; possibleCount[ni]--; changed = true; if (possibleCount[ni] === 0) return false; }
+          }
+          if (changed) stack.push(ni);
+        }
+      }
+      return true;
+    }
+
+    function step() {
+      let minE = Infinity, minCell = -1;
+      for (let i = 0; i < total; i++) {
+        if (possibleCount[i] <= 1) continue;
+        const e = entropy(i) + rng() * 0.001;
+        if (e < minE) { minE = e; minCell = i; }
+      }
+      if (minCell === -1) { wfcSolved = true; solving = false; buildGrid(); sE('wStatus').textContent = 'Solved!'; return false; }
+
+      // Collapse
+      const cell = wave[minCell];
+      let sumW = 0;
+      for (let t = 0; t < tc; t++) { if (cell[t]) sumW += weights[t]; }
+      let pick = rng() * sumW, chosen = -1;
+      for (let t = 0; t < tc; t++) { if (!cell[t]) continue; pick -= weights[t]; if (pick <= 0) { chosen = t; break; } }
+      if (chosen === -1) { for (let t = tc-1; t >= 0; t--) { if (cell[t]) { chosen = t; break; } } }
+      if (chosen === -1) { sE('wStatus').textContent = 'Contradiction!'; solving = false; return false; }
+      for (let t = 0; t < tc; t++) { if (t !== chosen && cell[t]) { cell[t] = false; possibleCount[minCell]--; } }
+
+      if (!propagate(minCell)) { sE('wStatus').textContent = 'Contradiction - retry'; solving = false; return false; }
+
+      let collapsed = 0;
+      for (let i = 0; i < total; i++) { if (possibleCount[i] === 1) collapsed++; }
+      sE('wStatus').textContent = `Collapsing: ${collapsed}/${total}`;
+      return true;
+    }
+
+    function buildGrid() {
+      wfcGrid = [];
+      for (let y = 0; y < gridSize; y++) {
+        wfcGrid[y] = [];
+        for (let x = 0; x < gridSize; x++) {
+          const ci = y * gridSize + x;
+          let tid = -1;
+          for (let t = 0; t < tc; t++) { if (wave[ci][t]) { tid = tiles[t].id; break; } }
+          wfcGrid[y][x] = tid;
+        }
+      }
+    }
+
+    solving = true;
+    if (animated) {
+      function animStep() {
+        if (!solving) return;
+        const cont = step();
+        buildGrid();
+        draw();
+        if (cont) stepTimer = setTimeout(animStep, 30);
+      }
+      animStep();
+    } else {
+      for (let i = 0; i < total * 10; i++) { if (!step()) break; }
+      buildGrid();
+      draw();
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
+    if (!wfcWave && !wfcGrid) {
+      ctx.fillStyle = '#555'; ctx.font = '14px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('Click "Solve" to run Wave Function Collapse', W/2, H/2);
+      return;
+    }
+    const tiles = wfcTiles || tileSets[tileSet];
+    const cs = Math.min(Math.floor((W - 40) / gridSize), Math.floor((H - 40) / gridSize));
+    const ox = Math.floor((W - gridSize * cs) / 2), oy = Math.floor((H - gridSize * cs) / 2);
+
+    for (let y = 0; y < gridSize; y++) for (let x = 0; x < gridSize; x++) {
+      const ci = y * gridSize + x;
+      const px = ox + x * cs, py = oy + y * cs;
+
+      if (wfcGrid && wfcGrid[y] && wfcGrid[y][x] >= 0) {
+        const tile = tiles.find(t => t.id === wfcGrid[y][x]);
+        if (tile) {
+          ctx.fillStyle = tile.color;
+          ctx.fillRect(px, py, cs, cs);
+          // Draw pipe graphics
+          if (tileSet === 'pipes' && tile.draw) {
+            ctx.strokeStyle = '#88ccff';
+            ctx.lineWidth = Math.max(2, cs / 6);
+            ctx.lineCap = 'round';
+            const cx = px + cs/2, cy = py + cs/2;
+            ctx.beginPath();
+            if (tile.draw === 'h') { ctx.moveTo(px, cy); ctx.lineTo(px+cs, cy); }
+            else if (tile.draw === 'v') { ctx.moveTo(cx, py); ctx.lineTo(cx, py+cs); }
+            else if (tile.draw === 'ne') { ctx.moveTo(cx, py); ctx.lineTo(cx, cy); ctx.lineTo(px+cs, cy); }
+            else if (tile.draw === 'se') { ctx.moveTo(px+cs, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, py+cs); }
+            else if (tile.draw === 'sw') { ctx.moveTo(cx, py+cs); ctx.lineTo(cx, cy); ctx.lineTo(px, cy); }
+            else if (tile.draw === 'nw') { ctx.moveTo(px, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, py); }
+            else if (tile.draw === 'cross') { ctx.moveTo(px, cy); ctx.lineTo(px+cs, cy); ctx.moveTo(cx, py); ctx.lineTo(cx, py+cs); }
+            else if (tile.draw === 'td') { ctx.moveTo(px, cy); ctx.lineTo(px+cs, cy); ctx.moveTo(cx, cy); ctx.lineTo(cx, py+cs); }
+            else if (tile.draw === 'tu') { ctx.moveTo(px, cy); ctx.lineTo(px+cs, cy); ctx.moveTo(cx, cy); ctx.lineTo(cx, py); }
+            else if (tile.draw === 'tl') { ctx.moveTo(cx, py); ctx.lineTo(cx, py+cs); ctx.moveTo(cx, cy); ctx.lineTo(px, cy); }
+            else if (tile.draw === 'tr') { ctx.moveTo(cx, py); ctx.lineTo(cx, py+cs); ctx.moveTo(cx, cy); ctx.lineTo(px+cs, cy); }
+            ctx.stroke();
+          }
+        }
+      } else if (wfcWave) {
+        // Show entropy as color
+        const wave = wfcWave[ci];
+        let count = 0;
+        for (let t = 0; t < tiles.length; t++) { if (wave[t]) count++; }
+        const ratio = count / tiles.length;
+        ctx.fillStyle = `rgba(59,130,246,${ratio * 0.3})`;
+        ctx.fillRect(px, py, cs, cs);
+        if (cs > 14) {
+          ctx.fillStyle = '#fff4';
+          ctx.font = `${Math.min(10, cs/3)}px monospace`;
+          ctx.textAlign = 'center';
+          ctx.fillText(count, px+cs/2, py+cs/2+3);
+        }
+      }
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px, py, cs, cs);
+    }
+  }
+
+  draw();
+}
+
+// ============================================================
+// TAB 7: POISSON DISK + L-SYSTEMS
+// ============================================================
+function initPoisson() {
+  const W = 720, H = 520;
+  // Two canvases side by side
+  const container = document.createElement('div');
+  container.className = 'split-canvas';
+  container.style.display = 'flex';
+  container.style.gap = '12px';
+  container.style.width = '100%';
+  container.style.height = '100%';
+  container.style.padding = '12px';
+
+  const c1 = createCanvas(340, 500);
+  const c2 = createCanvas(340, 500);
+  c1.style.flex = '1'; c1.style.maxWidth = '50%'; c1.style.height = '100%';
+  c2.style.flex = '1'; c2.style.maxWidth = '50%'; c2.style.height = '100%';
+  container.appendChild(c1); container.appendChild(c2);
+  canvasArea.appendChild(container);
+
+  const ctx1 = c1.getContext('2d');
+  const ctx2 = c2.getContext('2d');
+
+  let poissonDist = 25, lPreset = 'tree', lIter = 4;
+
+  controlsDiv.innerHTML = `
+    <span style="color:#3b82f6;font-size:12px;font-weight:600">Poisson Disk:</span>
+    <label>Distance <input type="range" id="pDist" min="8" max="60" value="25"><span id="pDv">25</span></label>
+    <button class="btn" id="pGen">Generate</button>
+    <span style="color:#3b82f6;font-size:12px;font-weight:600;margin-left:16px">L-System:</span>
+    <button class="btn" data-l="tree">Tree</button>
+    <button class="btn secondary" data-l="bush">Bush</button>
+    <button class="btn secondary" data-l="fern">Fern</button>
+    <button class="btn secondary" data-l="snowflake">Snowflake</button>
+    <label>Iter <input type="range" id="lIt" min="1" max="7" value="4"><span id="lIv">4</span></label>
+    <span class="status" id="plStatus"></span>
+  `;
+
+  const sE = id => document.getElementById(id);
+  sE('pDist').oninput = function() { poissonDist = +this.value; sE('pDv').textContent = this.value; };
+  sE('pGen').onclick = generatePoisson;
+  sE('lIt').oninput = function() { lIter = +this.value; sE('lIv').textContent = this.value; drawLSystem(); };
+
+  controlsDiv.querySelectorAll('[data-l]').forEach(btn => {
+    btn.onclick = () => {
+      controlsDiv.querySelectorAll('[data-l]').forEach(b => { b.classList.remove('active'); b.classList.add('secondary'); });
+      btn.classList.remove('secondary'); btn.classList.add('active');
+      lPreset = btn.dataset.l;
+      drawLSystem();
+    };
+  });
+
+  function generatePoisson() {
+    const points = poissonDisk(c1.width, c1.height, poissonDist, { seed: Date.now() });
+    ctx1.fillStyle = '#0a0a0a'; ctx1.fillRect(0, 0, c1.width, c1.height);
+
+    // Title
+    ctx1.fillStyle = '#3b82f6';
+    ctx1.font = 'bold 12px system-ui';
+    ctx1.textAlign = 'center';
+    ctx1.fillText('Poisson Disk Sampling', c1.width/2, 18);
+
+    // Draw distance circles (faint)
+    ctx1.globalAlpha = 0.08;
+    for (const p of points) {
+      ctx1.strokeStyle = '#3b82f6';
+      ctx1.beginPath();
+      ctx1.arc(p.x, p.y, poissonDist/2, 0, Math.PI*2);
+      ctx1.stroke();
+    }
+    ctx1.globalAlpha = 1;
+
+    // Draw points
+    for (const p of points) {
+      ctx1.fillStyle = '#3b82f6';
+      ctx1.beginPath();
+      ctx1.arc(p.x, p.y, 2.5, 0, Math.PI*2);
+      ctx1.fill();
+    }
+    sE('plStatus').textContent = `${points.length} points`;
+  }
+
+  function poissonDisk(width, height, minDist, options) {
+    const seed = options?.seed ?? Date.now();
+    const rng = createRNG(seed);
+    const cellSize = minDist / Math.SQRT2;
+    const gw = Math.ceil(width / cellSize), gh = Math.ceil(height / cellSize);
+    const grid = new Int32Array(gw * gh).fill(-1);
+    const points = [], active = [];
+
+    function toGrid(x, y) { return Math.floor(y/cellSize)*gw + Math.floor(x/cellSize); }
+    function isValid(x, y) {
+      if (x < 0 || x >= width || y < 0 || y >= height) return false;
+      const gx = Math.floor(x/cellSize), gy = Math.floor(y/cellSize);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const nx = gx+dx, ny = gy+dy;
+        if (nx<0||nx>=gw||ny<0||ny>=gh) continue;
+        const idx = grid[ny*gw+nx];
+        if (idx === -1) continue;
+        const p = points[idx];
+        const distSq = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
+        if (distSq < minDist*minDist) return false;
+      }
+      return true;
+    }
+    function insert(x, y) {
+      const idx = points.length;
+      points.push({x,y}); grid[toGrid(x,y)] = idx; active.push(idx);
+      return idx;
+    }
+    insert(rng()*width, rng()*height);
+    while (active.length > 0) {
+      const ai = Math.floor(rng()*active.length);
+      const origin = points[active[ai]];
+      let found = false;
+      for (let k = 0; k < 30; k++) {
+        const angle = rng()*Math.PI*2, dist = minDist+rng()*minDist;
+        const cx = origin.x+Math.cos(angle)*dist, cy = origin.y+Math.sin(angle)*dist;
+        if (isValid(cx,cy)) { insert(cx,cy); found=true; }
+      }
+      if (!found) { active[ai] = active[active.length-1]; active.pop(); }
+    }
+    return points;
+  }
+
+  const lPresets = {
+    tree: { axiom: 'F', rules: [{ pred: 'F', succ: 'FF+[+F-F-F]-[-F+F+F]' }], angle: 22.5, step: 4, color: '#22c55e' },
+    bush: { axiom: 'F', rules: [{ pred: 'F', succ: 'FF-[-F+F+F]+[+F-F-F]' }], angle: 25, step: 3.5, color: '#16a34a' },
+    fern: { axiom: 'X', rules: [{ pred: 'X', succ: 'F+[[X]-X]-F[-FX]+X' }, { pred: 'F', succ: 'FF' }], angle: 25, step: 3, color: '#15803d' },
+    snowflake: { axiom: 'F++F++F', rules: [{ pred: 'F', succ: 'F-F++F-F' }], angle: 60, step: 3, color: '#93c5fd' }
+  };
+
+  function drawLSystem() {
+    const preset = lPresets[lPreset];
+    const config = { axiom: preset.axiom, rules: preset.rules, iterations: lIter, angle: preset.angle, stepLength: preset.step };
+    const result = generateLSystemResult(config);
+
+    ctx2.fillStyle = '#0a0a0a'; ctx2.fillRect(0, 0, c2.width, c2.height);
+
+    // Title
+    ctx2.fillStyle = '#3b82f6';
+    ctx2.font = 'bold 12px system-ui';
+    ctx2.textAlign = 'center';
+    ctx2.fillText('L-System: ' + lPreset.charAt(0).toUpperCase() + lPreset.slice(1), c2.width/2, 18);
+
+    if (result.segments.length === 0) return;
+
+    // Find bounds
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const s of result.segments) {
+      minX = Math.min(minX, s.x1, s.x2); maxX = Math.max(maxX, s.x1, s.x2);
+      minY = Math.min(minY, s.y1, s.y2); maxY = Math.max(maxY, s.y1, s.y2);
+    }
+    const bw = maxX - minX || 1, bh = maxY - minY || 1;
+    const scale = Math.min((c2.width - 40) / bw, (c2.height - 60) / bh);
+    const offX = (c2.width - bw * scale) / 2 - minX * scale;
+    const offY = (c2.height - bh * scale) / 2 - minY * scale + 15;
+
+    ctx2.strokeStyle = preset.color;
+    ctx2.lineWidth = Math.max(1, 3 - lIter * 0.3);
+    ctx2.lineCap = 'round';
+    for (const s of result.segments) {
+      // Color based on depth (from start = trunk to end = leaf)
+      const idx = result.segments.indexOf(s);
+      const t = idx / result.segments.length;
+      const r = Math.round(34 + t * 50);
+      const g = Math.round(139 + t * 60);
+      const b = Math.round(34 - t * 20);
+      ctx2.strokeStyle = rgbStr(r, g, b);
+      ctx2.lineWidth = Math.max(0.5, (3 - lIter * 0.3) * (1 - t * 0.7));
+      ctx2.beginPath();
+      ctx2.moveTo(s.x1 * scale + offX, s.y1 * scale + offY);
+      ctx2.lineTo(s.x2 * scale + offX, s.y2 * scale + offY);
+      ctx2.stroke();
+    }
+
+    sE('plStatus').textContent = `${result.segments.length} segments`;
+  }
+
+  function generateLSystemResult(config) {
+    const { axiom, rules, iterations, angle, stepLength } = config;
+    const ruleMap = new Map();
+    for (const rule of rules) {
+      const existing = ruleMap.get(rule.pred);
+      if (existing) existing.push(rule); else ruleMap.set(rule.pred, [rule]);
+    }
+    let current = axiom;
+    for (let iter = 0; iter < iterations; iter++) {
+      let next = '';
+      for (let i = 0; i < current.length; i++) {
+        const ch = current[i];
+        const mr = ruleMap.get(ch);
+        if (!mr || mr.length === 0) { next += ch; continue; }
+        next += mr[0].succ;
+      }
+      current = next;
+      if (current.length > 100000) break; // safety
+    }
+    const angleRad = (angle * Math.PI) / 180;
+    const points = [], segments = [];
+    let x = 0, y = 0, heading = -Math.PI/2;
+    const stack = [];
+    points.push({x,y});
+    for (let i = 0; i < current.length; i++) {
+      const ch = current[i];
+      if (ch === 'F') {
+        const nx = x + Math.cos(heading)*stepLength, ny = y + Math.sin(heading)*stepLength;
+        segments.push({x1:x,y1:y,x2:nx,y2:ny}); x=nx; y=ny; points.push({x,y});
+      } else if (ch === 'f') { x += Math.cos(heading)*stepLength; y += Math.sin(heading)*stepLength; points.push({x,y}); }
+      else if (ch === '+') heading += angleRad;
+      else if (ch === '-') heading -= angleRad;
+      else if (ch === '[') stack.push({x,y,heading});
+      else if (ch === ']') { const s = stack.pop(); if (s) { x=s.x; y=s.y; heading=s.heading; } }
+    }
+    return { points, segments, string: current };
+  }
+
+  generatePoisson();
+  drawLSystem();
+}
+
+// ============================================================
+// TAB 8: AI BEHAVIOR
+// ============================================================
+function initAI() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const npcs = [];
+  let playerX = W/2, playerY = H/2;
+  let waypointMode = false, currentWaypoints = [];
+  const WALL_PAD = 20;
+
+  controlsDiv.innerHTML = `
+    <button class="btn" id="aiPatrol">Add Patrol</button>
+    <button class="btn secondary" id="aiGuard">Add Guard</button>
+    <button class="btn secondary" id="aiWander">Add Wanderer</button>
+    <button class="btn secondary" id="aiClear">Clear All</button>
+    <span style="font-size:11px;color:#71717a;margin-left:8px">Red = Player (follows mouse). Green = Patrol, Blue = Guard, Yellow = Wanderer</span>
+    <span class="status" id="aiStatus"></span>
+  `;
+
+  const sE = id => document.getElementById(id);
+
+  sE('aiPatrol').onclick = () => {
+    if (waypointMode) return;
+    waypointMode = true;
+    currentWaypoints = [];
+    sE('aiStatus').textContent = 'Click 2-5 waypoints, then press Enter or double-click last';
+  };
+
+  sE('aiGuard').onclick = () => {
+    npcs.push({
+      type: 'guard', x: 100 + Math.random()*(W-200), y: 100 + Math.random()*(H-200),
+      postX: 0, postY: 0, speed: 100, state: 'idle', color: '#3b82f6', detectRange: 150, chaseRange: 200
+    });
+    const n = npcs[npcs.length-1];
+    n.postX = n.x; n.postY = n.y;
+  };
+
+  sE('aiWander').onclick = () => {
+    const cx = 100 + Math.random()*(W-200), cy = 100 + Math.random()*(H-200);
+    npcs.push({
+      type: 'wanderer', x: cx, y: cy, speed: 50, state: 'wandering', color: '#eab308',
+      wanderCenterX: cx, wanderCenterY: cy, wanderRadius: 120, targetX: cx, targetY: cy, waitTimer: 0
+    });
+  };
+
+  sE('aiClear').onclick = () => { npcs.length = 0; };
+
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    playerX = (e.clientX - rect.left) * (W/rect.width);
+    playerY = (e.clientY - rect.top) * (H/rect.height);
+  };
+
+  canvas.onclick = (e) => {
+    if (!waypointMode) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (W/rect.width);
+    const y = (e.clientY - rect.top) * (H/rect.height);
+    currentWaypoints.push({x, y});
+    if (currentWaypoints.length >= 5) finishPatrol();
+  };
+
+  canvas.ondblclick = () => { if (waypointMode && currentWaypoints.length >= 2) finishPatrol(); };
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && waypointMode && currentWaypoints.length >= 2) finishPatrol();
+    if (e.key === 'Escape' && waypointMode) { waypointMode = false; currentWaypoints = []; sE('aiStatus').textContent = ''; }
+  });
+
+  function finishPatrol() {
+    const wps = [...currentWaypoints];
+    npcs.push({
+      type: 'patrol', x: wps[0].x, y: wps[0].y, speed: 80, state: 'patrolling',
+      color: '#22c55e', waypoints: wps, waypointIdx: 0, waitTimer: 0
+    });
+    waypointMode = false; currentWaypoints = [];
+    sE('aiStatus').textContent = 'Patrol added with ' + wps.length + ' waypoints';
+  }
+
+  function dist(x1, y1, x2, y2) { return Math.sqrt((x2-x1)**2+(y2-y1)**2); }
+
+  function moveToward(npc, tx, ty, dt) {
+    const d = dist(npc.x, npc.y, tx, ty);
+    if (d < 2) return true;
+    const step = Math.min(npc.speed * dt, d);
+    npc.x += (tx - npc.x) / d * step;
+    npc.y += (ty - npc.y) / d * step;
+    // Clamp to bounds
+    npc.x = clamp(npc.x, WALL_PAD, W - WALL_PAD);
+    npc.y = clamp(npc.y, WALL_PAD, H - WALL_PAD);
+    return false;
+  }
+
+  let lastT = performance.now();
+  function update() {
+    const now = performance.now(), dt = Math.min((now - lastT)/1000, 0.05);
+    lastT = now;
+
+    for (const npc of npcs) {
+      const dToPlayer = dist(npc.x, npc.y, playerX, playerY);
+
+      if (npc.type === 'patrol') {
+        if (npc.state === 'waiting') {
+          npc.waitTimer -= dt;
+          if (npc.waitTimer <= 0) {
+            npc.waypointIdx = (npc.waypointIdx + 1) % npc.waypoints.length;
+            npc.state = 'patrolling';
+          }
+        } else {
+          const wp = npc.waypoints[npc.waypointIdx];
+          if (moveToward(npc, wp.x, wp.y, dt)) {
+            npc.state = 'waiting';
+            npc.waitTimer = 0.8;
+          }
+        }
+      }
+
+      if (npc.type === 'guard') {
+        if (dToPlayer < npc.detectRange && npc.state !== 'chasing') {
+          npc.state = 'chasing';
+        }
+        if (npc.state === 'chasing') {
+          if (dToPlayer > npc.chaseRange) {
+            npc.state = 'returning';
+          } else {
+            moveToward(npc, playerX, playerY, dt);
+          }
+        } else if (npc.state === 'returning') {
+          if (moveToward(npc, npc.postX, npc.postY, dt)) {
+            npc.state = 'idle';
+          }
+        } else {
+          npc.state = 'idle';
+          if (dToPlayer < npc.detectRange) npc.state = 'chasing';
+        }
+      }
+
+      if (npc.type === 'wanderer') {
+        if (npc.state === 'waiting') {
+          npc.waitTimer -= dt;
+          if (npc.waitTimer <= 0) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * npc.wanderRadius;
+            npc.targetX = clamp(npc.wanderCenterX + Math.cos(angle)*r, WALL_PAD, W-WALL_PAD);
+            npc.targetY = clamp(npc.wanderCenterY + Math.sin(angle)*r, WALL_PAD, H-WALL_PAD);
+            npc.state = 'wandering';
+          }
+        } else {
+          if (moveToward(npc, npc.targetX, npc.targetY, dt)) {
+            npc.state = 'waiting';
+            npc.waitTimer = 1 + Math.random() * 2;
+          }
+        }
+      }
+    }
+
+    // Draw
+    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
+
+    // Room walls
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(WALL_PAD, WALL_PAD, W-WALL_PAD*2, H-WALL_PAD*2);
+
+    // Floor tiles
+    ctx.fillStyle = '#121218';
+    for (let y = WALL_PAD; y < H-WALL_PAD; y += 40) for (let x = WALL_PAD; x < W-WALL_PAD; x += 40) {
+      ctx.fillStyle = ((Math.floor(x/40)+Math.floor(y/40))%2===0) ? '#121218' : '#141420';
+      ctx.fillRect(x, y, 40, 40);
+    }
+
+    // Draw patrol waypoints being set
+    if (waypointMode && currentWaypoints.length > 0) {
+      ctx.strokeStyle = '#22c55e55';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(currentWaypoints[0].x, currentWaypoints[0].y);
+      for (let i = 1; i < currentWaypoints.length; i++) ctx.lineTo(currentWaypoints[i].x, currentWaypoints[i].y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (const wp of currentWaypoints) {
+        ctx.fillStyle = '#22c55e88';
+        ctx.beginPath(); ctx.arc(wp.x, wp.y, 6, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // Draw NPC patrol paths
+    for (const npc of npcs) {
+      if (npc.type === 'patrol' && npc.waypoints) {
+        ctx.strokeStyle = npc.color + '33';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        for (let i = 0; i < npc.waypoints.length; i++) {
+          const wp = npc.waypoints[i];
+          if (i === 0) ctx.moveTo(wp.x, wp.y); else ctx.lineTo(wp.x, wp.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (const wp of npc.waypoints) {
+          ctx.fillStyle = npc.color + '44';
+          ctx.beginPath(); ctx.arc(wp.x, wp.y, 4, 0, Math.PI*2); ctx.fill();
+        }
+      }
+
+      if (npc.type === 'guard') {
+        // Detection range
+        ctx.strokeStyle = npc.state === 'chasing' ? '#ef444433' : '#3b82f622';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(npc.postX, npc.postY, npc.detectRange, 0, Math.PI*2); ctx.stroke();
+        ctx.setLineDash([]);
+        // Post marker
+        ctx.fillStyle = '#3b82f633';
+        ctx.beginPath(); ctx.arc(npc.postX, npc.postY, 6, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // Draw NPCs
+    for (const npc of npcs) {
+      ctx.fillStyle = npc.color;
+      ctx.beginPath(); ctx.arc(npc.x, npc.y, 12, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#fff3';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(npc.x, npc.y, 12, 0, Math.PI*2); ctx.stroke();
+      // Eyes
+      const angle = Math.atan2(
+        (npc.type === 'guard' && npc.state === 'chasing') ? playerY - npc.y : (npc.targetX || npc.x) - npc.y,
+        (npc.type === 'guard' && npc.state === 'chasing') ? playerX - npc.x : (npc.targetX || npc.x) - npc.x
+      );
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(npc.x + Math.cos(angle)*4, npc.y + Math.sin(angle)*4, 2.5, 0, Math.PI*2); ctx.fill();
+      // State label
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(npc.state, npc.x, npc.y - 18);
+    }
+
+    // Draw player
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath(); ctx.arc(playerX, playerY, 14, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff5';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(playerX, playerY, 14, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('P', playerX, playerY + 3.5);
+
+    sE('aiStatus').textContent = `NPCs: ${npcs.length}`;
+
+    animFrame = requestAnimationFrame(update);
+  }
+  update();
+  activeCleanup = () => { cancelAnimationFrame(animFrame); animFrame = null; };
+}
+
+// ============================================================
+// TAB 9: AUDIO
+// ============================================================
+function initAudio() {
+  const W = 720, H = 520;
+  const canvas = createCanvas(W, H);
+  canvasArea.appendChild(canvas);
+  fitCanvas(canvas);
+  const ctx = canvas.getContext('2d');
+
+  let audioCtx = null;
+  let masterGain = null, sfxGain = null, musicGain = null;
+  let sourceX = W/2 + 150, sourceY = H/2 - 80;
+  let draggingSource = false;
+  let activeTone = null;
+  let masterVol = 0.5, sfxVol = 0.7, musicVol = 0.5;
+
+  function ensureAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain(); masterGain.gain.value = masterVol;
+    sfxGain = audioCtx.createGain(); sfxGain.gain.value = sfxVol;
+    musicGain = audioCtx.createGain(); musicGain.gain.value = musicVol;
+    sfxGain.connect(masterGain);
+    musicGain.connect(masterGain);
+    masterGain.connect(audioCtx.destination);
+  }
+
+  const notes = [
+    { name: 'C', freq: 261.63, color: '#ef4444' },
+    { name: 'D', freq: 293.66, color: '#f97316' },
+    { name: 'E', freq: 329.63, color: '#eab308' },
+    { name: 'F', freq: 349.23, color: '#22c55e' },
+    { name: 'G', freq: 392.00, color: '#3b82f6' },
+    { name: 'A', freq: 440.00, color: '#8b5cf6' },
+    { name: 'B', freq: 493.88, color: '#ec4899' }
+  ];
+
+  controlsDiv.innerHTML = `
+    <span style="color:#3b82f6;font-size:12px;font-weight:600">Tones:</span>
+    ${notes.map(n => `<button class="btn secondary" data-note="${n.name}" style="background:${n.color}55;border:1px solid ${n.color}">${n.name}</button>`).join('')}
+    <span style="margin-left:12px"></span>
+    <label>Master <input type="range" id="aMaster" min="0" max="100" value="50"></label>
+    <label>SFX <input type="range" id="aSfx" min="0" max="100" value="70"></label>
+    <label>Music <input type="range" id="aMusic" min="0" max="100" value="50"></label>
+    <span class="status" id="aStatus">Click a note or drag the speaker icon for spatial audio</span>
+  `;
+
+  controlsDiv.querySelectorAll('[data-note]').forEach(btn => {
+    btn.onclick = () => {
+      ensureAudio();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const note = notes.find(n => n.name === btn.dataset.note);
+      playTone(note.freq, 0.3);
+    };
+  });
+
+  document.getElementById('aMaster').oninput = function() { masterVol = this.value/100; if (masterGain) masterGain.gain.value = masterVol; };
+  document.getElementById('aSfx').oninput = function() { sfxVol = this.value/100; if (sfxGain) sfxGain.gain.value = sfxVol; };
+  document.getElementById('aMusic').oninput = function() { musicVol = this.value/100; if (musicGain) musicGain.gain.value = musicVol; };
+
+  function playTone(freq, duration) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(sfxGain);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  // Spatial audio: continuous tone from source
+  let spatialOsc = null, spatialGain = null, spatialPanner = null;
+
+  function startSpatialTone() {
+    if (spatialOsc) return;
+    ensureAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    spatialOsc = audioCtx.createOscillator();
+    spatialGain = audioCtx.createGain();
+    spatialPanner = audioCtx.createStereoPanner();
+    spatialOsc.type = 'triangle';
+    spatialOsc.frequency.value = 220;
+    spatialGain.gain.value = 0.2;
+    spatialOsc.connect(spatialGain);
+    spatialGain.connect(spatialPanner);
+    spatialPanner.connect(sfxGain);
+    spatialOsc.start();
+  }
+
+  function stopSpatialTone() {
+    if (!spatialOsc) return;
+    spatialOsc.stop();
+    spatialOsc = null; spatialGain = null; spatialPanner = null;
+  }
+
+  function updateSpatialPanning() {
+    if (!spatialPanner) return;
+    const listenerX = W/2, listenerY = H/2;
+    const dx = sourceX - listenerX;
+    const maxDist = 300;
+    const pan = clamp(dx / maxDist, -1, 1);
+    const distance = Math.sqrt((sourceX-listenerX)**2 + (sourceY-listenerY)**2);
+    const attenuation = clamp(1 - distance / maxDist, 0, 1);
+    spatialPanner.pan.value = pan;
+    if (spatialGain) spatialGain.gain.value = 0.3 * attenuation;
+  }
+
+  canvas.onmousedown = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (W/rect.width);
+    const y = (e.clientY - rect.top) * (H/rect.height);
+    const dx = x - sourceX, dy = y - sourceY;
+    if (dx*dx+dy*dy < 900) {
+      draggingSource = true;
+      startSpatialTone();
+    }
+  };
+
+  canvas.onmousemove = (e) => {
+    if (!draggingSource) return;
+    const rect = canvas.getBoundingClientRect();
+    sourceX = (e.clientX - rect.left) * (W/rect.width);
+    sourceY = (e.clientY - rect.top) * (H/rect.height);
+    updateSpatialPanning();
+  };
+
+  canvas.onmouseup = () => {
+    if (draggingSource) { draggingSource = false; stopSpatialTone(); }
+  };
+
+  function draw() {
+    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, W, H);
+
+    // Title area
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = 'bold 14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Web Audio API Demo', W/2, 30);
+
+    // Piano keys
+    const keyW = 70, keyH = 120, startX = (W - notes.length * (keyW + 8)) / 2, startY = 50;
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i];
+      const kx = startX + i * (keyW + 8), ky = startY;
+      // Key background
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(kx, ky, keyW, keyH);
+      ctx.strokeStyle = n.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(kx, ky, keyW, keyH);
+      // Note name
+      ctx.fillStyle = n.color;
+      ctx.font = 'bold 24px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.name, kx + keyW/2, ky + keyH/2 + 8);
+      // Frequency
+      ctx.fillStyle = '#71717a';
+      ctx.font = '10px monospace';
+      ctx.fillText(n.freq.toFixed(0) + 'Hz', kx + keyW/2, ky + keyH - 10);
+    }
+
+    // Spatial audio area
+    const spY = 210;
+    ctx.fillStyle = '#e4e4e7';
+    ctx.font = 'bold 12px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Spatial Audio - Drag the speaker', W/2, spY);
+
+    // Background area
+    ctx.fillStyle = '#111118';
+    ctx.fillRect(60, spY + 10, W - 120, 270);
+    ctx.strokeStyle = '#1e293b';
+    ctx.strokeRect(60, spY + 10, W - 120, 270);
+
+    // Listener (center)
+    const lx = W/2, ly = spY + 145;
+    // Range circles
+    for (let r = 1; r <= 3; r++) {
+      ctx.strokeStyle = `rgba(59,130,246,${0.15 - r*0.04})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.arc(lx, ly, r * 80, 0, Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Listener icon
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath(); ctx.arc(lx, ly, 15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px monospace';
+    ctx.fillText('EAR', lx, ly + 4);
+
+    // Panning line
+    const distance = Math.sqrt((sourceX-lx)**2 + (sourceY-ly)**2);
+    const pan = clamp((sourceX-lx)/300, -1, 1);
+    ctx.strokeStyle = '#3b82f644';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(sourceX, sourceY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Source icon
+    const sourceColor = draggingSource ? '#22c55e' : '#eab308';
+    ctx.fillStyle = sourceColor;
+    ctx.beginPath(); ctx.arc(sourceX, sourceY, 18, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff3';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sourceX, sourceY, 18, 0, Math.PI*2); ctx.stroke();
+    // Speaker icon
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SPK', sourceX, sourceY + 5);
+
+    // Sound waves animation
+    if (draggingSource) {
+      const now = performance.now() / 300;
+      for (let r = 0; r < 3; r++) {
+        const radius = 25 + ((now + r * 0.8) % 3) * 25;
+        const alpha = 1 - ((now + r * 0.8) % 3) / 3;
+        ctx.strokeStyle = rgbStr(234, 179, 8, alpha * 0.5);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(sourceX, sourceY, radius, 0, Math.PI*2); ctx.stroke();
+      }
+    }
+
+    // Pan/distance info
+    ctx.fillStyle = '#71717a';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Pan: ${pan.toFixed(2)} (L/R)`, 70, spY + 295);
+    ctx.fillText(`Distance: ${distance.toFixed(0)}px`, 70, spY + 310);
+    ctx.fillText(`Attenuation: ${clamp(1 - distance/300, 0, 1).toFixed(2)}`, 70, spY + 325);
+
+    // Volume meters
+    const mX = W - 200, mY = spY + 280;
+    const barW = 50;
+    ctx.fillStyle = '#71717a'; ctx.font = '10px monospace'; ctx.textAlign = 'right';
+    ctx.fillText('Master', mX - 5, mY + 4); ctx.fillStyle = '#333'; ctx.fillRect(mX, mY - 5, barW, 8);
+    ctx.fillStyle = '#3b82f6'; ctx.fillRect(mX, mY - 5, barW * masterVol, 8);
+    ctx.fillStyle = '#71717a'; ctx.fillText('SFX', mX - 5, mY + 18); ctx.fillStyle = '#333'; ctx.fillRect(mX, mY + 9, barW, 8);
+    ctx.fillStyle = '#22c55e'; ctx.fillRect(mX, mY + 9, barW * sfxVol, 8);
+    ctx.fillStyle = '#71717a'; ctx.fillText('Music', mX - 5, mY + 32); ctx.fillStyle = '#333'; ctx.fillRect(mX, mY + 23, barW, 8);
+    ctx.fillStyle = '#eab308'; ctx.fillRect(mX, mY + 23, barW * musicVol, 8);
+
+    animFrame = requestAnimationFrame(draw);
+  }
+
+  draw();
+  activeCleanup = () => {
+    cancelAnimationFrame(animFrame); animFrame = null;
+    stopSpatialTone();
+    if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; }
+  };
+}
+
+// ============================================================
+// TAB INIT MAP
+// ============================================================
+const tabInits = {
+  dungeon: initDungeon,
+  pathfinding: initPathfinding,
+  particles: initParticles,
+  lighting: initLighting,
+  animation: initAnimation,
+  wfc: initWFC,
+  poisson: initPoisson,
+  ai: initAI,
+  audio: initAudio
+};
+
+// Boot
+switchTab('dungeon');
+
+// Handle resize
+window.addEventListener('resize', () => {
+  const canvases = canvasArea.querySelectorAll('canvas');
+  canvases.forEach(c => fitCanvas(c));
+});
+</script>
+</body>
+</html>
