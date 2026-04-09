@@ -67,7 +67,7 @@ export interface AssetFilter {
   search: string;
 }
 
-export type ViewportMode = '2d' | '3d';
+export type ViewportMode = '2d' | '3d' | 'tilemap';
 
 export interface StudioState {
   entities: EntityData[];

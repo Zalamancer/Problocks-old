@@ -52,7 +52,7 @@ export function TopMenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [hoverMode, setHoverMode] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
-  const { isPlaying, setPlaying, addEntity, entities, addLog, resetScene, marketplaceOpen, toggleMarketplace } = useStudio();
+  const { isPlaying, setPlaying, addEntity, entities, addLog, resetScene, marketplaceOpen, toggleMarketplace, viewportMode, setViewportMode, setLeftPanelGroup } = useStudio();
 
   let entityCounter = 10;
   const insertEntity = (shape: 'box' | 'sphere' | 'cylinder') => {
@@ -219,6 +219,40 @@ export function TopMenuBar() {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* 2D / 3D / Tilemap toggle */}
+      <div className="flex items-center bg-zinc-800/60 rounded-md p-0.5 mr-2">
+        <button
+          onClick={() => setViewportMode('2d')}
+          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
+            viewportMode === '2d'
+              ? 'bg-blue-500 text-white'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          2D
+        </button>
+        <button
+          onClick={() => setViewportMode('3d')}
+          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
+            viewportMode === '3d'
+              ? 'bg-green-500 text-white'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          3D
+        </button>
+        <button
+          onClick={() => { setViewportMode('tilemap'); setLeftPanelGroup('tilemap'); }}
+          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
+            viewportMode === 'tilemap'
+              ? 'bg-purple-500 text-white'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Tile
+        </button>
+      </div>
 
       {/* Playback controls */}
       <div className="flex items-center gap-1 pr-3">

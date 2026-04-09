@@ -57,3 +57,15 @@ export * from './audio/index.js';
 
 // Input manager
 export * from './input/index.js';
+
+// Prefab system
+export * from './prefabs/index.js';
+
+// Navigation / pathfinding
+export * from './navigation/index.js';
+
+// Procedural generation
+export * from './procgen/index.js';
+
+// Rule-based placement
+export * from './placement/index.js';
