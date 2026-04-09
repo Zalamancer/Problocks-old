@@ -529,6 +529,8 @@ export function ViewportThree() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fps, setFps] = useState(0);
+  const [triangles, setTriangles] = useState(0);
+  const [drawCalls, setDrawCalls] = useState(0);
   const [ready, setReady] = useState(false);
   const { selectEntity, entities, isPlaying } = useStudio();
   const terrainEntity = entities.find(e => e.id === '__terrain');
@@ -623,8 +625,7 @@ export function ViewportThree() {
       tr.character.visible = isPlaying;
     }
     if (isPlaying) {
-      // Start running animation and head-cam
-      if (tr.runAction) tr.runAction.reset().play();
+      // Head-cam on, but don't start run animation — it plays only when moving
       if (tr.headBone) {
         tr.headCamMode = true;
         tr.controls.enabled = false;
@@ -636,7 +637,6 @@ export function ViewportThree() {
       tr.isJumping = false;
       tr.headCamMode = false;
       tr.controls.enabled = true;
-      // Reset character position
       if (tr.character) {
         tr.character.position.set(0, 0, 0);
         tr.character.rotation.set(0, 0, 0);
@@ -875,6 +875,10 @@ export function ViewportThree() {
     // ── Wheel: orbit / pinch-zoom / pan / brush-size ──
     let bHeld = false;
     function onKeyDown(e: KeyboardEvent) {
+      // Don't capture keys when terminal, script editor, or any input is focused
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'textarea' || tag === 'input' || document.activeElement?.closest('.xterm')) return;
+
       if (e.key === 'b' || e.key === 'B') bHeld = true;
       // WASD movement
       const k = e.key.toLowerCase();
@@ -907,6 +911,9 @@ export function ViewportThree() {
       }
     }
     function onKeyUp(e: KeyboardEvent) {
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'textarea' || tag === 'input' || document.activeElement?.closest('.xterm')) return;
+
       if (e.key === 'b' || e.key === 'B') bHeld = false;
       const k = e.key.toLowerCase();
       if (k === 'w') keys.current.w = false;
@@ -969,7 +976,12 @@ export function ViewportThree() {
       const now = performance.now();
       const delta = clock.getDelta();
       fc++; fa += now - lt; lt = now;
-      if (fa >= 500) { setFps(Math.round(fc / (fa / 1000))); fc = 0; fa = 0; }
+      if (fa >= 500) {
+        setFps(Math.round(fc / (fa / 1000)));
+        setTriangles(renderer.info.render.triangles);
+        setDrawCalls(renderer.info.render.calls);
+        fc = 0; fa = 0;
+      }
       grassMat.uniforms.uTime.value = time;
 
       // Update character animation
@@ -978,10 +990,21 @@ export function ViewportThree() {
         tr.charMixer.update(delta);
       }
 
-      // WASD movement
-      if (tr?.character) {
+      // WASD movement — only when character is visible (playing)
+      if (tr?.character?.visible) {
         const char = tr.character;
         const k = keys.current;
+        const moving = k.w || k.a || k.s || k.d;
+
+        // Start/stop run animation based on movement
+        if (tr.runAction && !tr.isJumping) {
+          if (moving && !tr.runAction.isRunning()) {
+            tr.runAction.reset().play();
+          } else if (!moving && tr.runAction.isRunning()) {
+            tr.runAction.stop();
+          }
+        }
+
         // A/D rotate the character
         if (k.a) char.rotation.y += TURN_SPEED * delta;
         if (k.d) char.rotation.y -= TURN_SPEED * delta;
@@ -1048,6 +1071,9 @@ export function ViewportThree() {
       {/* Bottom info */}
       <div className="absolute bottom-2 left-2 flex gap-2">
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">FPS: {ready ? fps : '--'}</span>
+        <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">{ready ? `${(triangles * 3).toLocaleString()} verts` : '--'}</span>
+        <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">{ready ? `${triangles.toLocaleString()} tris` : '--'}</span>
+        <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">{ready ? `${drawCalls} draws` : '--'}</span>
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">Three.js</span>
         <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] text-gray-400">
           Left click: sculpt &bull; Right drag: orbit &bull; Scroll: orbit &bull; Pinch: zoom &bull; Dbl-click: pan mode
