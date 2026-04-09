@@ -145,7 +145,7 @@ function meshSurfaceArea(geo: THREE.BufferGeometry): number {
 /** Blade count from density (blades/m²) and mesh surface area */
 function grassBladeCount(geo: THREE.BufferGeometry): number {
   const area = meshSurfaceArea(geo);
-  return Math.min(500000, Math.max(100, Math.round(area * sculptState.grassDensity)));
+  return Math.min(MAX_BLADES, Math.max(100, Math.round(area * sculptState.grassDensity)));
 }
 
 // ── Grass blade generation (surface-scattered) ─────────────────────
@@ -173,7 +173,7 @@ function tangentFrame(nx: number, ny: number, nz: number): { t: [number,number,n
   return { t, b: [b0, b1, b2] };
 }
 
-const MAX_BLADES = 500000;
+const MAX_BLADES = 2_000_000;
 const TRIS_PER_BLADE = 3;
 const INDICES_PER_BLADE = TRIS_PER_BLADE * 3; // 9
 
