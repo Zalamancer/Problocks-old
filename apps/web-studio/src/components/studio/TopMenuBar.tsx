@@ -52,7 +52,7 @@ export function TopMenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [hoverMode, setHoverMode] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
-  const { isPlaying, setPlaying, addEntity, entities, addLog, resetScene, marketplaceOpen, toggleMarketplace, viewportMode, setViewportMode, setLeftPanelGroup } = useStudio();
+  const { isPlaying, setPlaying, addEntity, entities, addLog, resetScene, marketplaceOpen, toggleMarketplace, gameMode, runScript, stopScript, scriptCode } = useStudio();
 
   let entityCounter = 10;
   const insertEntity = (shape: 'box' | 'sphere' | 'cylinder') => {
@@ -149,7 +149,7 @@ export function TopMenuBar() {
       id: 'file',
       label: 'File',
       items: [
-        { id: 'new', label: 'New Simulation', icon: FileCode, onClick: () => resetScene() },
+        { id: 'new', label: 'New Game', icon: FileCode, shortcut: '⌘N', onClick: () => resetScene() },
         { separator: true },
         { id: 'save', label: 'Save', icon: Save, shortcut: '\u2318S', onClick: () => { saveScene(entities); addLog('[system] Scene saved'); } },
         { id: 'publish', label: 'Publish to Marketplace', icon: Upload, onClick: () => {} },
@@ -220,44 +220,19 @@ export function TopMenuBar() {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* 2D / 3D / Tilemap toggle */}
-      <div className="flex items-center bg-zinc-800/60 rounded-md p-0.5 mr-2">
-        <button
-          onClick={() => setViewportMode('2d')}
-          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
-            viewportMode === '2d'
-              ? 'bg-blue-500 text-white'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          2D
-        </button>
-        <button
-          onClick={() => setViewportMode('3d')}
-          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
-            viewportMode === '3d'
-              ? 'bg-green-500 text-white'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          3D
-        </button>
-        <button
-          onClick={() => { setViewportMode('tilemap'); setLeftPanelGroup('tilemap'); }}
-          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
-            viewportMode === 'tilemap'
-              ? 'bg-purple-500 text-white'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          Tile
-        </button>
-      </div>
+      {/* Game mode badge (locked) */}
+      <GameModeBadge />
 
       {/* Playback controls */}
       <div className="flex items-center gap-1 pr-3">
         <button
-          onClick={() => setPlaying(true)}
+          onClick={() => {
+            if (scriptCode) {
+              runScript(scriptCode);
+            } else {
+              setPlaying(true);
+            }
+          }}
           disabled={isPlaying}
           className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
             isPlaying
@@ -269,7 +244,7 @@ export function TopMenuBar() {
           Play
         </button>
         <button
-          onClick={() => setPlaying(false)}
+          onClick={() => { stopScript(); setPlaying(false); }}
           disabled={!isPlaying}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 transition-colors disabled:opacity-40"
         >
@@ -361,6 +336,26 @@ function DirectMenuButton({
       >
         {menu.label}
       </button>
+    </div>
+  );
+}
+
+const MODE_BADGE_STYLES: Record<string, { label: string; color: string }> = {
+  '2d': { label: '2D Game', color: 'bg-blue-500' },
+  '3d': { label: '3D Game', color: 'bg-green-500' },
+  'hex': { label: 'Hex Map', color: 'bg-purple-500' },
+  'isometric': { label: 'Isometric', color: 'bg-amber-500' },
+  'cubes': { label: 'Voxel', color: 'bg-cyan-500' },
+};
+
+function GameModeBadge() {
+  const { gameMode } = useStudio();
+  if (!gameMode) return null;
+  const style = MODE_BADGE_STYLES[gameMode];
+  if (!style) return null;
+  return (
+    <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md mr-2 ${style.color}`}>
+      <span className="text-[10px] font-bold text-white">{style.label}</span>
     </div>
   );
 }
