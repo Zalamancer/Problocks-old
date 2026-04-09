@@ -385,5 +385,7 @@ pb.ai.generateAsset(prompt) → assetId
 | Pathfinding (JPS) | DONE | `packages/engine/src/navigation/` |
 | Flow Fields | DONE | `packages/engine/src/navigation/` |
 | Line of Sight | DONE | `packages/engine/src/navigation/` |
-| Behavior Trees / FSM | NOT STARTED | `packages/engine/src/ai/` |
-| QuickJS API Extensions | NOT STARTED | `packages/engine/src/scripting/` |
+| Behavior Trees / FSM | DONE | `packages/engine/src/ai/` |
+| NPC Presets (6) | DONE | `packages/engine/src/ai/behaviors/` |
+| AI System Manager | DONE | `packages/engine/src/ai/ai-system.ts` |
+| QuickJS API Extensions (66 functions) | DONE | `packages/engine/src/scripting/api-extensions.ts` |
