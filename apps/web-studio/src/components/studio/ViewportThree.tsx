@@ -173,7 +173,7 @@ function tangentFrame(nx: number, ny: number, nz: number): { t: [number,number,n
   return { t, b: [b0, b1, b2] };
 }
 
-const MAX_BLADES = 2_000_000;
+const MAX_BLADES = 5_000_000;
 const TRIS_PER_BLADE = 3;
 const INDICES_PER_BLADE = TRIS_PER_BLADE * 3; // 9
 

@@ -433,7 +433,7 @@ function SculptPanel() {
           <h4 className="text-xs font-medium text-zinc-400">Grass Density</h4>
           <span className="text-xs text-zinc-500 tabular-nums">{grassDensity} / m²</span>
         </div>
-        <input type="range" min={5} max={2000} step={5} value={grassDensity}
+        <input type="range" min={5} max={5000} step={10} value={grassDensity}
           onChange={(e) => sculptState.setGrassDensity(parseInt(e.target.value))}
           className="w-full accent-green-500" />
         <div className="flex justify-between text-[10px] text-zinc-600 mt-0.5">
