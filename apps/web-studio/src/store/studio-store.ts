@@ -47,10 +47,11 @@ export interface EntityData {
   terrain?: TerrainConfig;
 }
 
-export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt' | 'tilemap';
-export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt' | 'tilemap';
+export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt' | 'tilemap' | 'create';
+export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt' | 'tilemap' | 'create';
 
-export type TilemapTool = 'paint' | 'erase' | 'fill' | 'rect' | 'eyedropper';
+export type TilemapTool = 'paint' | 'erase' | 'fill' | 'rect' | 'eyedropper' | 'raise' | 'lower';
+export type HexBrushShape = 'hex' | 'ring' | 'random';
 
 export interface TilesetInfo {
   id: string;
@@ -62,19 +63,47 @@ export interface TilesetInfo {
   rows: number;
 }
 
+export interface HexPaletteTile {
+  id: number;
+  name: string;
+  dataUrl: string;
+}
+
+export interface HexMapData {
+  map: Record<string, number>;        // "q,r" → palette index
+  rotMap: Record<string, number>;     // "q,r" → rotation in radians
+  flipMap: Record<string, boolean>;   // "q,r" → flip
+  heightMap: Record<string, number>;  // "q,r" → stack height
+}
+
 export interface AssetFilter {
   category: AssetCategory | 'all';
   search: string;
 }
 
-export type ViewportMode = '2d' | '3d' | 'tilemap';
+export type ViewportMode = '2d' | '3d' | 'tilemap' | 'rpg';
+
+/** Game creation mode — locked once a project is created */
+export type GameMode = '2d' | '3d' | 'hex' | 'isometric' | 'cubes';
+
+/** Which left-panel tabs are available per game mode */
+export const MODE_PANELS: Record<GameMode, LeftPanelGroup[]> = {
+  '2d':        ['scene', 'scripts', 'assets', 'insert', 'create', 'settings'],
+  '3d':        ['scene', 'scripts', 'assets', 'insert', 'sculpt', 'terrain', 'create', 'settings'],
+  'hex':       ['tilemap', 'scripts', 'assets', 'create', 'settings'],
+  'isometric': ['tilemap', 'scripts', 'assets', 'create', 'settings'],
+  'cubes':     ['sculpt', 'scene', 'scripts', 'assets', 'insert', 'create', 'settings'],
+};
 
 export interface StudioState {
+  /** null = mode selector shown, otherwise locked */
+  gameMode: GameMode | null;
   entities: EntityData[];
   selectedEntityId: string | null;
   isPlaying: boolean;
   consoleLogs: string[];
   scriptRunning: boolean;
+  scriptCode: string;
   marketplaceOpen: boolean;
   leftPanelCollapsed: boolean;
   leftPanelActiveGroup: LeftPanelGroup;
@@ -88,15 +117,33 @@ export interface StudioState {
   activeTilemapTool: TilemapTool;
   loadedTilesets: TilesetInfo[];
 
+  // Hex painter state
+  hexBrushSize: number;
+  hexBrushShape: HexBrushShape;
+  hexShowGrid: boolean;
+  hexShowCoords: boolean;
+  hexClipToHex: boolean;
+  hexTileZoom: number;
+  hexRandomRotation: boolean;
+  hexRandomFlip: boolean;
+  hexRandomPalette: boolean;
+  hexRandomBrushSize: boolean;
+  hexYOffset: number;
+  hexPalette: HexPaletteTile[];
+  hexSelectedTile: number;
+  hexMapData: HexMapData;
+
   // Asset browser state
   assets: AssetEntry[];
   selectedAssetId: string | null;
   assetFilter: AssetFilter;
   aiGeneratorOpen: boolean;
   projectStyle: string;
+  selectedAITool: string | null;
 }
 
 export interface StudioActions {
+  setGameMode: (mode: GameMode) => void;
   selectEntity: (id: string | null) => void;
   updateEntity: (id: string, partial: Partial<EntityData>) => void;
   addEntity: (entity: EntityData) => void;
@@ -107,6 +154,7 @@ export interface StudioActions {
   setLeftPanelGroup: (group: LeftPanelGroup) => void;
   setLeftPanelTab: (tab: LeftPanelTab) => void;
   setViewportMode: (mode: ViewportMode) => void;
+  setScriptCode: (code: string) => void;
   runScript: (code: string) => void;
   stopScript: () => void;
   addLog: (msg: string) => void;
@@ -124,6 +172,25 @@ export interface StudioActions {
   reorderLayers: (fromIndex: number, toIndex: number) => void;
   addLoadedTileset: (tileset: TilesetInfo) => void;
 
+  // Hex painter actions
+  setHexBrushSize: (size: number) => void;
+  setHexBrushShape: (shape: HexBrushShape) => void;
+  setHexShowGrid: (show: boolean) => void;
+  setHexShowCoords: (show: boolean) => void;
+  setHexClipToHex: (clip: boolean) => void;
+  setHexTileZoom: (zoom: number) => void;
+  setHexRandomRotation: (on: boolean) => void;
+  setHexRandomFlip: (on: boolean) => void;
+  setHexRandomPalette: (on: boolean) => void;
+  setHexRandomBrushSize: (on: boolean) => void;
+  setHexYOffset: (offset: number) => void;
+  hexAddTile: (name: string, dataUrl: string) => void;
+  hexRemoveTile: (index: number) => void;
+  hexClearPalette: () => void;
+  setHexSelectedTile: (index: number) => void;
+  setHexMapData: (data: HexMapData) => void;
+  hexUpdateMap: (updater: (data: HexMapData) => HexMapData) => void;
+
   // Asset browser actions
   addAsset: (asset: AssetEntry) => void;
   removeAsset: (id: string) => void;
@@ -131,6 +198,7 @@ export interface StudioActions {
   setAssetFilter: (filter: Partial<AssetFilter>) => void;
   setAiGeneratorOpen: (open: boolean) => void;
   setProjectStyle: (style: string) => void;
+  setSelectedAITool: (tool: string | null) => void;
 }
 
 export type StudioContextType = StudioState & StudioActions;

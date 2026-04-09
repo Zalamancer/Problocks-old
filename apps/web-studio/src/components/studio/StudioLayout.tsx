@@ -4,7 +4,9 @@ import { LeftPanel, LeftPanelToggle } from './LeftPanel';
 import { ViewportThree } from './ViewportThree';
 import { Viewport2D } from './Viewport2D';
 import { TilemapViewport } from './TilemapViewport';
+import { RPGViewport } from './RPGViewport';
 import { PropertiesPanel } from './PropertiesPanel';
+import { AIToolPanel } from './AIToolPanel';
 import { ScriptEditor } from './ScriptEditor';
 import { TerminalPanel } from './Terminal';
 import { useStudio } from '@/store/studio-store';
@@ -22,7 +24,8 @@ import { useStudio } from '@/store/studio-store';
  * └──────────┴────────────────────────────┴─────────────┘
  */
 export function StudioLayout() {
-  const { marketplaceOpen, viewportMode } = useStudio();
+  const { marketplaceOpen, viewportMode, selectedAITool, leftPanelActiveGroup } = useStudio();
+  const showAIPanel = leftPanelActiveGroup === 'create';
   const [bottomTab, setBottomTab] = useState<'playground' | 'script' | 'terminal'>('playground');
   const [terminalFullscreen, setTerminalFullscreen] = useState(false);
 
@@ -77,7 +80,7 @@ export function StudioLayout() {
             {/* Viewport — 2D or 3D (hidden when terminal is fullscreen) */}
             {!terminalFullscreen && (
               <div className="flex-1 bg-zinc-900/80 backdrop-blur-xl border border-white/[0.06] rounded-xl overflow-hidden">
-                {viewportMode === '3d' ? <ViewportThree /> : viewportMode === 'tilemap' ? <TilemapViewport /> : <Viewport2D />}
+                {viewportMode === '3d' ? <ViewportThree /> : viewportMode === 'tilemap' ? <TilemapViewport /> : viewportMode === 'rpg' ? <RPGViewport /> : <Viewport2D />}
               </div>
             )}
 
@@ -143,8 +146,8 @@ export function StudioLayout() {
             </div>
           </div>
 
-          {/* Right Panel — Properties */}
-          <PropertiesPanel />
+          {/* Right Panel — AI Tool Settings or Properties */}
+          {showAIPanel ? <AIToolPanel /> : <PropertiesPanel />}
         </div>
 
         {/* Toggle pill */}

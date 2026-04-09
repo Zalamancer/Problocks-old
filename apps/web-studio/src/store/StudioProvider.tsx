@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { StudioContext, DEFAULT_ENTITIES, type EntityData, type LeftPanelGroup, type LeftPanelTab, type ViewportMode, type TilemapTool, type TilesetInfo, type AssetFilter } from './studio-store';
+import { StudioContext, DEFAULT_ENTITIES, type EntityData, type LeftPanelGroup, type LeftPanelTab, type ViewportMode, type TilemapTool, type TilesetInfo, type AssetFilter, type HexBrushShape, type HexPaletteTile, type HexMapData } from './studio-store';
 import type { TilemapConfig } from '@problocks/engine';
 import type { AssetEntry } from '@problocks/engine';
 import { saveScene, loadScene, clearScene } from './storage';
@@ -13,6 +13,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const [scriptRunning, setScriptRunning] = useState(false);
+  const [scriptCode, setScriptCode] = useState('');
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [leftPanelActiveGroup, setLeftPanelActiveGroup] = useState<LeftPanelGroup>('scene');
@@ -26,12 +27,71 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [activeTilemapTool, setActiveTilemapTool] = useState<TilemapTool>('paint');
   const [loadedTilesets, setLoadedTilesets] = useState<TilesetInfo[]>([]);
 
+  // Hex painter state
+  const [hexBrushSize, setHexBrushSize] = useState(8);
+  const [hexBrushShape, setHexBrushShape] = useState<HexBrushShape>('hex');
+  const [hexShowGrid, setHexShowGrid] = useState(false);
+  const [hexShowCoords, setHexShowCoords] = useState(false);
+  const [hexClipToHex, setHexClipToHex] = useState(true);
+  const [hexTileZoom, setHexTileZoom] = useState(15);
+  const [hexRandomRotation, setHexRandomRotation] = useState(false);
+  const [hexRandomFlip, setHexRandomFlip] = useState(false);
+  const [hexRandomPalette, setHexRandomPalette] = useState(false);
+  const [hexRandomBrushSize, setHexRandomBrushSize] = useState(false);
+  const [hexYOffset, setHexYOffset] = useState(0);
+  const [hexPalette, setHexPalette] = useState<HexPaletteTile[]>([]);
+  const [hexSelectedTile, setHexSelectedTile] = useState(-1);
+  const [hexMapData, setHexMapData] = useState<HexMapData>({ map: {}, rotMap: {}, flipMap: {}, heightMap: {} });
+  const hexPalIdRef = useRef(0);
+
+  const hexAddTile = useCallback((name: string, dataUrl: string) => {
+    const id = hexPalIdRef.current++;
+    setHexPalette(prev => {
+      const next = [...prev, { id, name, dataUrl }];
+      // Auto-select first tile
+      if (prev.length === 0) setHexSelectedTile(0);
+      return next;
+    });
+  }, []);
+
+  const hexRemoveTile = useCallback((index: number) => {
+    setHexPalette(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      // Fix map references
+      setHexMapData(md => {
+        const newMap: Record<string, number> = {};
+        for (const [key, val] of Object.entries(md.map)) {
+          if (val === index) continue;
+          newMap[key] = val > index ? val - 1 : val;
+        }
+        return { ...md, map: newMap };
+      });
+      return next;
+    });
+    setHexSelectedTile(prev => prev >= hexPalette.length - 1 ? Math.max(-1, hexPalette.length - 2) : prev);
+  }, [hexPalette.length]);
+
+  const hexClearPalette = useCallback(() => {
+    setHexPalette([]);
+    setHexSelectedTile(-1);
+    setHexMapData({ map: {}, rotMap: {}, flipMap: {}, heightMap: {} });
+  }, []);
+
+  const hexUpdateMap = useCallback((updater: (data: HexMapData) => HexMapData) => {
+    setHexMapData(prev => updater(prev));
+  }, []);
+
   // Asset browser state
   const [assets, setAssets] = useState<AssetEntry[]>([]);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [assetFilter, setAssetFilterRaw] = useState<AssetFilter>({ category: 'all', search: '' });
   const [aiGeneratorOpen, setAiGeneratorOpen] = useState(false);
   const [projectStyle, setProjectStyle] = useState('Medieval Fantasy');
+  const [selectedAITool, setSelectedAIToolRaw] = useState<string | null>(null);
+
+  const setSelectedAITool = useCallback((tool: string | null) => {
+    setSelectedAIToolRaw(tool);
+  }, []);
 
   const simRef = useRef<SimulationLoop | null>(null);
   const sandboxRef = useRef<QuickJSRuntime | null>(null);
@@ -329,11 +389,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = {
+    gameMode: null as null,
     entities,
     selectedEntityId,
     isPlaying,
     consoleLogs,
     scriptRunning,
+    scriptCode,
+    setScriptCode,
     marketplaceOpen,
     leftPanelCollapsed,
     leftPanelActiveGroup,
@@ -371,6 +434,39 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     reorderLayers,
     addLoadedTileset,
 
+    // Hex painter
+    hexBrushSize,
+    hexBrushShape,
+    hexShowGrid,
+    hexShowCoords,
+    hexClipToHex,
+    hexTileZoom,
+    hexRandomRotation,
+    hexRandomFlip,
+    hexRandomPalette,
+    hexRandomBrushSize,
+    hexYOffset,
+    setHexBrushSize,
+    setHexBrushShape,
+    setHexShowGrid,
+    setHexShowCoords,
+    setHexClipToHex,
+    setHexTileZoom,
+    setHexRandomRotation,
+    setHexRandomFlip,
+    setHexRandomPalette,
+    setHexRandomBrushSize,
+    setHexYOffset,
+    hexPalette,
+    hexSelectedTile,
+    hexMapData,
+    hexAddTile,
+    hexRemoveTile,
+    hexClearPalette,
+    setHexSelectedTile,
+    setHexMapData,
+    hexUpdateMap,
+
     // Asset browser
     assets,
     selectedAssetId,
@@ -383,6 +479,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setAssetFilter,
     setAiGeneratorOpen,
     setProjectStyle,
+    selectedAITool,
+    setSelectedAITool,
 
     _simRef: simRef,
   };

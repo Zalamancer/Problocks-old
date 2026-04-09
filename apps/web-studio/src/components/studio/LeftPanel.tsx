@@ -27,6 +27,8 @@ import { useStudio, type LeftPanelGroup, type LeftPanelTab } from '@/store/studi
 import { ExplorerPanel } from './ExplorerPanel';
 import { TilemapEditor } from './TilemapEditor';
 import { AssetBrowser } from './AssetBrowser';
+import { AICreatePanel } from './AICreatePanel';
+import { Sparkles } from 'lucide-react';
 import { sculptState, VOXEL_PRESETS, type SculptTool, type SculptAxis } from './sculpt-state';
 import type { LucideIcon } from 'lucide-react';
 
@@ -90,6 +92,12 @@ const TAB_GROUPS: TabGroupDef[] = [
     subTabs: [{ id: 'terrain', label: 'Terrain Editor', icon: Layers }],
   },
   {
+    id: 'create',
+    label: 'Create',
+    icon: Sparkles,
+    subTabs: [{ id: 'create', label: 'AI Create', icon: Sparkles }],
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: Settings,
@@ -130,7 +138,7 @@ function InsertPanel() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+    <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1.5">
       {items.map((item) => {
         const Icon = item.icon;
         return (
@@ -160,7 +168,7 @@ function InsertPanel() {
 
 function SettingsPanel() {
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
       <div>
         <h4 className="text-xs font-medium text-zinc-400 mb-2">Simulation</h4>
         <div className="space-y-2">
@@ -333,7 +341,7 @@ function SculptPanel() {
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+    <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-4">
       {/* Tool selection */}
       <div>
         <h4 className="text-xs font-medium text-zinc-400 mb-2">Tool</h4>
@@ -463,6 +471,8 @@ function PanelContent({ group }: { group: LeftPanelGroup }) {
       return <AssetBrowser />;
     case 'tilemap':
       return <TilemapEditor />;
+    case 'create':
+      return <AICreatePanel />;
     case 'insert':
       return <InsertPanel />;
     case 'sculpt':
