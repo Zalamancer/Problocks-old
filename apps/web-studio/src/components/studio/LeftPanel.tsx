@@ -20,10 +20,13 @@ import {
   Wrench,
   Cog,
   Mountain,
+  Map,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStudio, type LeftPanelGroup, type LeftPanelTab } from '@/store/studio-store';
 import { ExplorerPanel } from './ExplorerPanel';
+import { TilemapEditor } from './TilemapEditor';
+import { AssetBrowser } from './AssetBrowser';
 import { sculptState, VOXEL_PRESETS, type SculptTool, type SculptAxis } from './sculpt-state';
 import type { LucideIcon } from 'lucide-react';
 
@@ -67,6 +70,12 @@ const TAB_GROUPS: TabGroupDef[] = [
     label: 'Insert',
     icon: PlusCircle,
     subTabs: [{ id: 'insert', label: 'Insert Objects', icon: Box }],
+  },
+  {
+    id: 'tilemap',
+    label: 'Tilemap',
+    icon: Map,
+    subTabs: [{ id: 'tilemap', label: 'Tilemap Editor', icon: Map }],
   },
   {
     id: 'sculpt',
@@ -451,7 +460,9 @@ function PanelContent({ group }: { group: LeftPanelGroup }) {
         </div>
       );
     case 'assets':
-      return <AssetsPanel />;
+      return <AssetBrowser />;
+    case 'tilemap':
+      return <TilemapEditor />;
     case 'insert':
       return <InsertPanel />;
     case 'sculpt':

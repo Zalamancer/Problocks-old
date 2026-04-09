@@ -39,3 +39,21 @@ export * from './tilemap/index.js';
 
 // Asset manager + AI generation pipeline
 export * from './assets/index.js';
+
+// Sprite animation + tweening
+export * from './animation/index.js';
+
+// 2D camera
+export * from './camera/index.js';
+
+// 2D lighting
+export * from './lighting/index.js';
+
+// Particle system
+export * from './particles/index.js';
+
+// Audio engine
+export * from './audio/index.js';
+
+// Input manager
+export * from './input/index.js';

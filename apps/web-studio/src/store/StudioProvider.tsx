@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { StudioContext, DEFAULT_ENTITIES, type EntityData, type LeftPanelGroup, type LeftPanelTab } from './studio-store';
+import { StudioContext, DEFAULT_ENTITIES, type EntityData, type LeftPanelGroup, type LeftPanelTab, type ViewportMode, type TilemapTool, type TilesetInfo, type AssetFilter } from './studio-store';
+import type { TilemapConfig } from '@problocks/engine';
+import type { AssetEntry } from '@problocks/engine';
 import { saveScene, loadScene, clearScene } from './storage';
 import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import type { QuickJSRuntime } from '@problocks/engine/scripting/quickjs-runtime';
@@ -14,6 +16,22 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [leftPanelActiveGroup, setLeftPanelActiveGroup] = useState<LeftPanelGroup>('scene');
   const [leftPanelActiveTab, setLeftPanelActiveTab] = useState<LeftPanelTab>('scene');
+  const [viewportMode, setViewportMode] = useState<ViewportMode>('3d');
+
+  // Tilemap state
+  const [tilemapConfig, setTilemapConfigRaw] = useState<TilemapConfig | null>(null);
+  const [activeTilemapLayer, setActiveTilemapLayer] = useState(0);
+  const [activeTileId, setActiveTileId] = useState(1);
+  const [activeTilemapTool, setActiveTilemapTool] = useState<TilemapTool>('paint');
+  const [loadedTilesets, setLoadedTilesets] = useState<TilesetInfo[]>([]);
+
+  // Asset browser state
+  const [assets, setAssets] = useState<AssetEntry[]>([]);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [assetFilter, setAssetFilterRaw] = useState<AssetFilter>({ category: 'all', search: '' });
+  const [aiGeneratorOpen, setAiGeneratorOpen] = useState(false);
+  const [projectStyle, setProjectStyle] = useState('Medieval Fantasy');
+
   const simRef = useRef<SimulationLoop | null>(null);
   const sandboxRef = useRef<QuickJSRuntime | null>(null);
 
@@ -161,6 +179,74 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     addLog('--- Script stopped ---');
   }, [addLog]);
 
+  // ── Tilemap actions ──────────────────────────────────────────────────
+  const setTilemapConfig = useCallback((config: TilemapConfig) => {
+    setTilemapConfigRaw(config);
+  }, []);
+
+  const addTilemapLayer = useCallback((name: string) => {
+    setTilemapConfigRaw(prev => {
+      if (!prev) return prev;
+      const rows = prev.mapHeight;
+      const cols = prev.mapWidth;
+      const emptyData = Array.from({ length: rows }, () => Array(cols).fill(0));
+      return {
+        ...prev,
+        layers: [...prev.layers, { name, data: emptyData, visible: true, opacity: 1 }],
+      };
+    });
+  }, []);
+
+  const removeTilemapLayer = useCallback((index: number) => {
+    setTilemapConfigRaw(prev => {
+      if (!prev || prev.layers.length <= 1) return prev;
+      return { ...prev, layers: prev.layers.filter((_, i) => i !== index) };
+    });
+    setActiveTilemapLayer(prev => Math.max(0, prev - 1));
+  }, []);
+
+  const toggleLayerVisibility = useCallback((index: number) => {
+    setTilemapConfigRaw(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        layers: prev.layers.map((l, i) => i === index ? { ...l, visible: !l.visible } : l),
+      };
+    });
+  }, []);
+
+  const reorderLayers = useCallback((fromIndex: number, toIndex: number) => {
+    setTilemapConfigRaw(prev => {
+      if (!prev) return prev;
+      const layers = [...prev.layers];
+      const [moved] = layers.splice(fromIndex, 1);
+      layers.splice(toIndex, 0, moved);
+      return { ...prev, layers };
+    });
+  }, []);
+
+  const addLoadedTileset = useCallback((tileset: TilesetInfo) => {
+    setLoadedTilesets(prev => [...prev, tileset]);
+  }, []);
+
+  // ── Asset browser actions ───────────────────────────────────────────
+  const addAsset = useCallback((asset: AssetEntry) => {
+    setAssets(prev => [...prev, asset]);
+  }, []);
+
+  const removeAsset = useCallback((id: string) => {
+    setAssets(prev => prev.filter(a => a.metadata.id !== id));
+    setSelectedAssetId(prev => prev === id ? null : prev);
+  }, []);
+
+  const setSelectedAsset = useCallback((id: string | null) => {
+    setSelectedAssetId(id);
+  }, []);
+
+  const setAssetFilter = useCallback((filter: Partial<AssetFilter>) => {
+    setAssetFilterRaw(prev => ({ ...prev, ...filter }));
+  }, []);
+
   const value = {
     entities,
     selectedEntityId,
@@ -171,6 +257,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     leftPanelCollapsed,
     leftPanelActiveGroup,
     leftPanelActiveTab,
+    viewportMode,
     selectEntity,
     updateEntity,
     addEntity,
@@ -180,11 +267,42 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     toggleLeftPanel,
     setLeftPanelGroup,
     setLeftPanelTab,
+    setViewportMode,
     runScript,
     stopScript,
     addLog,
     clearLogs,
     resetScene,
+
+    // Tilemap
+    tilemapConfig,
+    activeTilemapLayer,
+    activeTileId,
+    activeTilemapTool,
+    loadedTilesets,
+    setTilemapConfig,
+    setActiveTilemapLayer,
+    setActiveTileId,
+    setActiveTilemapTool,
+    addTilemapLayer,
+    removeTilemapLayer,
+    toggleLayerVisibility,
+    reorderLayers,
+    addLoadedTileset,
+
+    // Asset browser
+    assets,
+    selectedAssetId,
+    assetFilter,
+    aiGeneratorOpen,
+    projectStyle,
+    addAsset,
+    removeAsset,
+    setSelectedAsset,
+    setAssetFilter,
+    setAiGeneratorOpen,
+    setProjectStyle,
+
     _simRef: simRef,
   };
 

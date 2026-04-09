@@ -1,4 +1,6 @@
 import { createContext, useContext } from 'react';
+import type { TilemapConfig, GridType } from '@problocks/engine';
+import type { AssetEntry, AssetCategory } from '@problocks/engine';
 
 /**
  * Minimal studio state — shared between Explorer, Viewport, Properties.
@@ -45,8 +47,27 @@ export interface EntityData {
   terrain?: TerrainConfig;
 }
 
-export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt';
-export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt';
+export type LeftPanelTab = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt' | 'tilemap';
+export type LeftPanelGroup = 'scene' | 'scripts' | 'assets' | 'insert' | 'settings' | 'terrain' | 'sculpt' | 'tilemap';
+
+export type TilemapTool = 'paint' | 'erase' | 'fill' | 'rect' | 'eyedropper';
+
+export interface TilesetInfo {
+  id: string;
+  name: string;
+  imageUrl: string;
+  tileWidth: number;
+  tileHeight: number;
+  columns: number;
+  rows: number;
+}
+
+export interface AssetFilter {
+  category: AssetCategory | 'all';
+  search: string;
+}
+
+export type ViewportMode = '2d' | '3d';
 
 export interface StudioState {
   entities: EntityData[];
@@ -58,6 +79,21 @@ export interface StudioState {
   leftPanelCollapsed: boolean;
   leftPanelActiveGroup: LeftPanelGroup;
   leftPanelActiveTab: LeftPanelTab;
+  viewportMode: ViewportMode;
+
+  // Tilemap state
+  tilemapConfig: TilemapConfig | null;
+  activeTilemapLayer: number;
+  activeTileId: number;
+  activeTilemapTool: TilemapTool;
+  loadedTilesets: TilesetInfo[];
+
+  // Asset browser state
+  assets: AssetEntry[];
+  selectedAssetId: string | null;
+  assetFilter: AssetFilter;
+  aiGeneratorOpen: boolean;
+  projectStyle: string;
 }
 
 export interface StudioActions {
@@ -70,11 +106,31 @@ export interface StudioActions {
   toggleLeftPanel: () => void;
   setLeftPanelGroup: (group: LeftPanelGroup) => void;
   setLeftPanelTab: (tab: LeftPanelTab) => void;
+  setViewportMode: (mode: ViewportMode) => void;
   runScript: (code: string) => void;
   stopScript: () => void;
   addLog: (msg: string) => void;
   clearLogs: () => void;
   resetScene: () => void;
+
+  // Tilemap actions
+  setTilemapConfig: (config: TilemapConfig) => void;
+  setActiveTilemapLayer: (layer: number) => void;
+  setActiveTileId: (tileId: number) => void;
+  setActiveTilemapTool: (tool: TilemapTool) => void;
+  addTilemapLayer: (name: string) => void;
+  removeTilemapLayer: (index: number) => void;
+  toggleLayerVisibility: (index: number) => void;
+  reorderLayers: (fromIndex: number, toIndex: number) => void;
+  addLoadedTileset: (tileset: TilesetInfo) => void;
+
+  // Asset browser actions
+  addAsset: (asset: AssetEntry) => void;
+  removeAsset: (id: string) => void;
+  setSelectedAsset: (id: string | null) => void;
+  setAssetFilter: (filter: Partial<AssetFilter>) => void;
+  setAiGeneratorOpen: (open: boolean) => void;
+  setProjectStyle: (style: string) => void;
 }
 
 export type StudioContextType = StudioState & StudioActions;
