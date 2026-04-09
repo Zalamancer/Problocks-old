@@ -359,22 +359,31 @@ pb.ai.generateAsset(prompt) → assetId
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| Isometric Grid System | NOT STARTED | `packages/engine/src/tilemap/` |
-| Tilemap Renderer | NOT STARTED | `packages/engine/src/tilemap/` |
-| Auto-Tiling | NOT STARTED | `packages/engine/src/tilemap/` |
-| Asset Manager | NOT STARTED | `packages/engine/src/assets/` |
-| AI Generator Service | NOT STARTED | `packages/engine/src/assets/` |
-| Style System | NOT STARTED | `packages/engine/src/assets/` |
-| Asset Browser UI | NOT STARTED | `apps/web-studio/src/components/studio/` |
-| Sprite Animation | NOT STARTED | `packages/engine/src/animation/` |
-| 2D Camera | NOT STARTED | `packages/engine/src/camera/` |
-| 2D Lighting | NOT STARTED | `packages/engine/src/lighting/` |
-| Particle System | NOT STARTED | `packages/engine/src/particles/` |
-| Audio Engine | NOT STARTED | `packages/engine/src/audio/` |
-| Input Manager | NOT STARTED | `packages/engine/src/input/` |
-| Prefab System | NOT STARTED | `packages/engine/src/prefabs/` |
-| Rule-Based Placement | NOT STARTED | `packages/engine/src/placement/` |
-| Procedural Gen (BSP) | NOT STARTED | `packages/engine/src/procgen/` |
-| Procedural Gen (WFC) | NOT STARTED | `packages/engine/src/procgen/` |
-| Pathfinding (A*) | NOT STARTED | `packages/engine/src/navigation/` |
+| Isometric Grid System | DONE | `packages/engine/src/tilemap/` |
+| Tilemap Renderer | DONE | `packages/engine/src/tilemap/` |
+| Auto-Tiling | DONE | `packages/engine/src/tilemap/` |
+| Asset Manager | DONE | `packages/engine/src/assets/` |
+| AI Generator Service | DONE | `packages/engine/src/assets/` |
+| Style System | DONE | `packages/engine/src/assets/` |
+| Asset Browser UI | DONE | `apps/web-studio/src/components/studio/AssetBrowser.tsx` |
+| Tilemap Editor UI | DONE | `apps/web-studio/src/components/studio/TilemapEditor.tsx` |
+| Tilemap Viewport | DONE | `apps/web-studio/src/components/studio/TilemapViewport.tsx` |
+| Sprite Animation | DONE | `packages/engine/src/animation/` |
+| 2D Camera | DONE | `packages/engine/src/camera/` |
+| 2D Lighting | DONE | `packages/engine/src/lighting/` |
+| Particle System | DONE | `packages/engine/src/particles/` |
+| Audio Engine | DONE | `packages/engine/src/audio/` |
+| Input Manager | DONE | `packages/engine/src/input/` |
+| Prefab System | DONE | `packages/engine/src/prefabs/` |
+| Rule-Based Placement | DONE | `packages/engine/src/placement/` |
+| Procedural Gen (BSP) | DONE | `packages/engine/src/procgen/` |
+| Procedural Gen (WFC) | DONE | `packages/engine/src/procgen/` |
+| Procedural Gen (Poisson) | DONE | `packages/engine/src/procgen/` |
+| Procedural Gen (L-Systems) | DONE | `packages/engine/src/procgen/` |
+| Seeded Noise | DONE | `packages/engine/src/procgen/` |
+| Pathfinding (A*) | DONE | `packages/engine/src/navigation/` |
+| Pathfinding (JPS) | DONE | `packages/engine/src/navigation/` |
+| Flow Fields | DONE | `packages/engine/src/navigation/` |
+| Line of Sight | DONE | `packages/engine/src/navigation/` |
 | Behavior Trees / FSM | NOT STARTED | `packages/engine/src/ai/` |
+| QuickJS API Extensions | NOT STARTED | `packages/engine/src/scripting/` |
