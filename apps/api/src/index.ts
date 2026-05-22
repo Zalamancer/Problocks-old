@@ -7,6 +7,7 @@ import { authRouter } from './routes/auth.js';
 import { usersRouter } from './routes/users.js';
 import { classroomsRouter } from './routes/classrooms.js';
 import { economyRouter } from './routes/economy.js';
+import { learningRouter } from './routes/learning.js';
 
 // Initialize database + auto-seed if empty
 initDb();
@@ -47,6 +48,7 @@ app.route('/api/simulations', simulationsRouter);
 app.route('/api/users', usersRouter);
 app.route('/api/classrooms', classroomsRouter);
 app.route('/api/economy', economyRouter);
+app.route('/api/learning', learningRouter);
 
 // Start server
 const PORT = parseInt(process.env.PORT ?? '5000', 10);

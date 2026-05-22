@@ -282,7 +282,7 @@ declare function onTick(dt: number): void;
 `;
 
 export function ScriptEditor() {
-  const { isPlaying, scriptRunning, consoleLogs, runScript, stopScript, clearLogs, viewportMode, setViewportMode, setLeftPanelGroup } = useStudio();
+  const { isPlaying, scriptRunning, consoleLogs, runScript, stopScript, clearLogs, viewportMode, setViewportMode, setLeftPanelGroup, setScriptCode } = useStudio();
   const editorRef = useRef<any>(null);
   const [showConsole, setShowConsole] = useState(true);
 
@@ -300,8 +300,14 @@ export function ScriptEditor() {
     setLeftPanelGroup('tilemap');
   }, [setViewportMode, setLeftPanelGroup]);
 
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    if (value !== undefined) setScriptCode(value);
+  }, [setScriptCode]);
+
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
+    // Sync initial code to store
+    setScriptCode(editor.getValue());
 
     // Register Problocks SDK type definitions for IntelliSense
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
@@ -399,6 +405,7 @@ export function ScriptEditor() {
             defaultValue={DEFAULT_CODE}
             theme="vs-dark"
             onMount={handleMount}
+            onChange={handleEditorChange}
             options={{
               fontSize: 13,
               fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', Menlo, monospace",

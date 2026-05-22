@@ -13,6 +13,8 @@ import {
   RotateCcw,
   Store,
   Settings,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useStudio } from '@/store/studio-store';
 import { saveScene } from '@/store/storage';
@@ -52,7 +54,7 @@ export function TopMenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [hoverMode, setHoverMode] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
-  const { isPlaying, setPlaying, addEntity, entities, addLog, resetScene, marketplaceOpen, toggleMarketplace, gameMode, runScript, stopScript, scriptCode } = useStudio();
+  const { isPlaying, setPlaying, addEntity, entities, addLog, resetScene, marketplaceOpen, toggleMarketplace, gameMode, runScript, stopScript, scriptCode, theme, toggleTheme } = useStudio();
 
   let entityCounter = 10;
   const insertEntity = (shape: 'box' | 'sphere' | 'cylinder') => {
@@ -258,6 +260,13 @@ export function TopMenuBar() {
           <RotateCcw size={12} />
         </button>
         <span className="text-[10px] text-zinc-600 ml-2">v0.0.1</span>
+        <button
+          onClick={toggleTheme}
+          className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
+          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        >
+          {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
+        </button>
         <button
           className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
           title="Settings"

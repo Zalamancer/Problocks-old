@@ -40,3 +40,34 @@ export type { PoissonOptions } from './poisson.js';
 
 // L-Systems
 export { generateLSystem } from './lsystem.js';
+
+// Seeded Simplex noise & PRNG
+export { SimplexNoise, SeededRNG } from './simplex-noise.js';
+
+// World generation pipeline
+export type {
+  TerrainType,
+  ZoneType,
+  WorldNPC,
+  PlayerStart,
+  ObjectPlacementRule,
+  Footprint,
+  WorldData,
+  WorldGenConfig,
+} from './world-gen.js';
+export {
+  ZONES,
+  generateTerrain,
+  stampTownPlaza,
+  detectZones,
+  canPlace,
+  stampObject,
+  placeObjects,
+  placeBridges,
+  placeNPCs,
+  findPlayerStart,
+  generateWorld,
+  DEFAULT_FOOTPRINTS,
+  DEFAULT_WALKABLE_OBJECTS,
+  DEFAULT_ZONE_OBJECTS,
+} from './world-gen.js';

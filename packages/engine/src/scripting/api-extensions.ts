@@ -33,6 +33,26 @@ import type { AssetCategory } from '../assets/asset-schema.js';
 import type { PrefabRegistry } from '../prefabs/prefab-registry.js';
 import type { PrefabInstantiator } from '../prefabs/prefab-instantiator.js';
 import type { Scene } from '../core/scene.js';
+import type { NPCManager } from '../npc/npc-manager.js';
+import type { Player2D } from '../player/player-2d.js';
+import { generateWorld } from '../procgen/world-gen.js';
+
+// ── Learning & Economy interfaces ────────────────────────────────────
+// These mirror the types from @problocks/learning and @problocks/economy
+// without creating a hard dependency. The host provides implementations.
+
+interface LearningService {
+  pickSubtopic(masteryData: unknown[]): unknown;
+  adjustDifficulty(level: number, correctStreak: number, wrongStreak: number): number;
+  updateMastery(current: number, isCorrect: boolean): number;
+  calculateStreaks(recentAnswers: boolean[]): { correctStreak: number; wrongStreak: number };
+}
+
+interface EconomyService {
+  calculateReward(difficulty: number, isCorrect: boolean): { coins: number; xp: number };
+  calculateLevel(xp: number): number;
+  levelProgress(xp: number): number;
+}
 
 // ── Dependency interface ────────────────────────────────────────────
 
@@ -48,6 +68,10 @@ export interface APIExtensionDeps {
   prefabRegistry?: PrefabRegistry;
   prefabInstantiator?: PrefabInstantiator;
   scene?: Scene;
+  npcManager?: NPCManager;
+  player2D?: Player2D;
+  learningService?: LearningService;
+  economyService?: EconomyService;
 }
 
 // ── FSM tracking for scripting layer ────────────────────────────────
@@ -618,6 +642,112 @@ export function registerAPIExtensions(
     return JSON.stringify(value ?? null);
   });
 
+  // ── NPC API ────────────────────────────────────────────────────
+
+  runtime.registerHostFunction('npc.spawn', (...args: unknown[]) => {
+    if (!deps.npcManager || args.length < 1) return;
+    const config = JSON.parse(args[0] as string);
+    deps.npcManager.spawn(config);
+  });
+
+  runtime.registerHostFunction('npc.remove', (...args: unknown[]) => {
+    if (!deps.npcManager || args.length < 1) return;
+    deps.npcManager.remove(args[0] as string);
+  });
+
+  runtime.registerHostFunction('npc.setPosition', (...args: unknown[]) => {
+    if (!deps.npcManager || args.length < 3) return;
+    deps.npcManager.setPosition(
+      args[0] as string,
+      args[1] as number,
+      args[2] as number,
+    );
+  });
+
+  runtime.registerHostFunction('npc.setDialogue', (...args: unknown[]) => {
+    if (!deps.npcManager || args.length < 2) return;
+    const dialogue = JSON.parse(args[1] as string);
+    deps.npcManager.setDialogue(args[0] as string, dialogue);
+  });
+
+  runtime.registerHostFunction('npc.getNearby', (...args: unknown[]) => {
+    if (!deps.npcManager || args.length < 2) return '';
+    const npc = deps.npcManager.getNearby(
+      args[0] as number,
+      args[1] as number,
+    );
+    if (!npc) return '';
+    return JSON.stringify({
+      id: npc.config.id,
+      name: npc.config.name,
+      x: npc.config.x,
+      y: npc.config.y,
+    });
+  });
+
+  runtime.registerHostFunction('npc.interact', (...args: unknown[]) => {
+    if (!deps.npcManager || args.length < 2) return '';
+    const npc = deps.npcManager.interact(
+      args[0] as number,
+      args[1] as number,
+    );
+    if (!npc) return '';
+    return npc.config.id;
+  });
+
+  runtime.registerHostFunction('npc.getAll', () => {
+    if (!deps.npcManager) return '[]';
+    return JSON.stringify(
+      deps.npcManager.getAll().map((n) => ({
+        id: n.config.id,
+        name: n.config.name,
+        x: n.config.x,
+        y: n.config.y,
+      })),
+    );
+  });
+
+  // ── World Generation API ──────────────────────────────────────
+
+  runtime.registerHostFunction('procgen.generateWorld', (...args: unknown[]) => {
+    if (args.length < 3) return '{}';
+    const seed = args[0] as number;
+    const width = args[1] as number;
+    const height = args[2] as number;
+    const config = args.length >= 4 && args[3]
+      ? JSON.parse(args[3] as string)
+      : undefined;
+    const world = generateWorld(seed, width, height, config);
+    return JSON.stringify(world);
+  });
+
+  // ── Player 2D API ─────────────────────────────────────────────
+
+  runtime.registerHostFunction('player.getPosition', () => {
+    if (!deps.player2D) return '0,0';
+    return `${deps.player2D.x},${deps.player2D.y}`;
+  });
+
+  runtime.registerHostFunction('player.getTilePosition', () => {
+    if (!deps.player2D) return '0,0';
+    return `${deps.player2D.tileX},${deps.player2D.tileY}`;
+  });
+
+  runtime.registerHostFunction('player.setPosition', (...args: unknown[]) => {
+    if (!deps.player2D || args.length < 2) return;
+    deps.player2D.setPosition(args[0] as number, args[1] as number);
+  });
+
+  runtime.registerHostFunction('player.getDirection', () => {
+    if (!deps.player2D) return 'down';
+    return deps.player2D.direction;
+  });
+
+  runtime.registerHostFunction('player.isMoving', () => {
+    if (!deps.player2D) return 0;
+    return deps.player2D.moving ? 1 : 0;
+  });
+
   // ── Prefab API ─────────────────────────────────────────────────
 
   runtime.registerHostFunction('prefab.spawn', (...args: unknown[]) => {
@@ -724,6 +854,60 @@ export function registerAPIExtensions(
     if (entry.status === 'pending') return 'pending';
     if (entry.status === 'complete') return `complete:${entry.assetId}`;
     return `error:${entry.error ?? 'unknown'}`;
+  });
+
+  // ── Learning API ────────────────────────────────────────────────
+
+  runtime.registerHostFunction('learning.adjustDifficulty', (...args: unknown[]) => {
+    if (!deps.learningService || args.length < 3) return 1;
+    return deps.learningService.adjustDifficulty(
+      args[0] as number,
+      args[1] as number,
+      args[2] as number,
+    );
+  });
+
+  runtime.registerHostFunction('learning.updateMastery', (...args: unknown[]) => {
+    if (!deps.learningService || args.length < 2) return 0;
+    return deps.learningService.updateMastery(
+      args[0] as number,
+      (args[1] as number) !== 0,
+    );
+  });
+
+  runtime.registerHostFunction('learning.calculateStreaks', (...args: unknown[]) => {
+    if (!deps.learningService || args.length < 1) return '0,0';
+    const answers: boolean[] = JSON.parse(args[0] as string);
+    const { correctStreak, wrongStreak } = deps.learningService.calculateStreaks(answers);
+    return `${correctStreak},${wrongStreak}`;
+  });
+
+  runtime.registerHostFunction('learning.pickSubtopic', (...args: unknown[]) => {
+    if (!deps.learningService || args.length < 1) return '{}';
+    const masteryData = JSON.parse(args[0] as string);
+    const result = deps.learningService.pickSubtopic(masteryData);
+    return JSON.stringify(result);
+  });
+
+  // ── Economy API ─────────────────────────────────────────────────
+
+  runtime.registerHostFunction('economy.calculateReward', (...args: unknown[]) => {
+    if (!deps.economyService || args.length < 2) return '0,0';
+    const reward = deps.economyService.calculateReward(
+      args[0] as number,
+      (args[1] as number) !== 0,
+    );
+    return `${reward.coins},${reward.xp}`;
+  });
+
+  runtime.registerHostFunction('economy.calculateLevel', (...args: unknown[]) => {
+    if (!deps.economyService || args.length < 1) return 1;
+    return deps.economyService.calculateLevel(args[0] as number);
+  });
+
+  runtime.registerHostFunction('economy.levelProgress', (...args: unknown[]) => {
+    if (!deps.economyService || args.length < 1) return 0;
+    return deps.economyService.levelProgress(args[0] as number);
   });
 }
 

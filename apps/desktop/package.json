@@ -1,0 +1,15 @@
+{
+  "name": "@problocks/desktop",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Problocks Studio — desktop app with integrated terminal for Claude Code",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron main.js",
+    "build": "electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^35.0.0"
+  }
+}

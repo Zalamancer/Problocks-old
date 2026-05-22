@@ -50,5 +50,23 @@ export type {
 // ECS component
 export { IsometricTilemapComponent } from './tilemap-component.js';
 
+// Wang tile system (terrain transitions)
+export type {
+  TerrainId,
+  WangTransition,
+  PureTileSource,
+  WangTileResult,
+} from './wang-tile.js';
+export {
+  getVertexTerrain,
+  buildVertexGrid,
+  resolveWangTile,
+  normGrassTerrain,
+  TERRAIN,
+  DEFAULT_TERRAIN_PRIORITY,
+  DEFAULT_TRANSITIONS,
+  DEFAULT_PURE_TILE_SOURCES,
+} from './wang-tile.js';
+
 // PixiJS renderer
 export { TilemapRenderer } from './tilemap-renderer.js';

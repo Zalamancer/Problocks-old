@@ -95,7 +95,10 @@ export const MODE_PANELS: Record<GameMode, LeftPanelGroup[]> = {
   'cubes':     ['sculpt', 'scene', 'scripts', 'assets', 'insert', 'create', 'settings'],
 };
 
+export type Theme = 'dark' | 'light';
+
 export interface StudioState {
+  theme: Theme;
   /** null = mode selector shown, otherwise locked */
   gameMode: GameMode | null;
   entities: EntityData[];
@@ -143,6 +146,7 @@ export interface StudioState {
 }
 
 export interface StudioActions {
+  toggleTheme: () => void;
   setGameMode: (mode: GameMode) => void;
   selectEntity: (id: string | null) => void;
   updateEntity: (id: string, partial: Partial<EntityData>) => void;

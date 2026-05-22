@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { fetchSimulations, type Simulation } from '@/lib/api';
 import { SimulationCard } from './SimulationCard';
 import { SimulationGridSkeleton } from './SimulationSkeleton';
+import { getHardwareProfile, type DeviceTier } from '@/lib/hardware';
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
   physics: 'linear-gradient(135deg, #2d1b69, #11998e)',
@@ -23,6 +24,7 @@ interface SimulationGridProps {
 export function SimulationGrid({ category, search }: SimulationGridProps) {
   const [sims, setSims] = useState<Simulation[]>([]);
   const [loading, setLoading] = useState(true);
+  const hw = useMemo(() => getHardwareProfile(), []);
 
   useEffect(() => {
     setLoading(true);
@@ -60,6 +62,11 @@ export function SimulationGrid({ category, search }: SimulationGridProps) {
 
   return (
     <>
+      {hw.tier === 'low' && (
+        <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-2 text-sm text-amber-200">
+          Lite mode — showing games optimized for your device. Some 3D games may be hidden.
+        </div>
+      )}
       {!search && (
         <section className="mb-8">
           <h2 className="mb-4 text-xl font-bold">

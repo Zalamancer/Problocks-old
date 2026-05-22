@@ -153,6 +153,101 @@ export function initDb(): void {
     CREATE INDEX IF NOT EXISTS idx_simulations_category ON simulations(category);
     CREATE INDEX IF NOT EXISTS idx_simulations_plays ON simulations(plays DESC);
     CREATE INDEX IF NOT EXISTS idx_simulations_user ON simulations(user_id);
+
+    -- Learning system tables
+    CREATE TABLE IF NOT EXISTS subjects (
+      id TEXT PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      description TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS topics (
+      id TEXT PRIMARY KEY,
+      subject_id TEXT NOT NULL REFERENCES subjects(id),
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(subject_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS subtopics (
+      id TEXT PRIMARY KEY,
+      topic_id TEXT NOT NULL REFERENCES topics(id),
+      name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(topic_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS question_cache (
+      id TEXT PRIMARY KEY,
+      subtopic_id TEXT NOT NULL REFERENCES subtopics(id),
+      difficulty_level INTEGER NOT NULL CHECK(difficulty_level BETWEEN 1 AND 5),
+      question_text TEXT NOT NULL,
+      choices_json TEXT NOT NULL,
+      correct_index INTEGER NOT NULL,
+      explanation TEXT DEFAULT '',
+      encounter_type TEXT NOT NULL DEFAULT 'npc',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_question_cache_subtopic
+      ON question_cache(subtopic_id, difficulty_level);
+
+    CREATE TABLE IF NOT EXISTS player_profiles (
+      user_id TEXT PRIMARY KEY REFERENCES users(id),
+      coins INTEGER DEFAULT 0,
+      xp INTEGER DEFAULT 0,
+      level INTEGER DEFAULT 1,
+      login_streak INTEGER DEFAULT 0,
+      last_login TEXT,
+      display_name TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS student_mastery (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      subtopic_id TEXT NOT NULL REFERENCES subtopics(id),
+      mastery_pct REAL DEFAULT 0,
+      difficulty_level INTEGER DEFAULT 1 CHECK(difficulty_level BETWEEN 1 AND 5),
+      correct_count INTEGER DEFAULT 0,
+      incorrect_count INTEGER DEFAULT 0,
+      last_attempted TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, subtopic_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_student_mastery_user
+      ON student_mastery(user_id);
+
+    CREATE TABLE IF NOT EXISTS answer_log (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      question_id TEXT REFERENCES question_cache(id),
+      subtopic_id TEXT NOT NULL REFERENCES subtopics(id),
+      is_correct INTEGER NOT NULL,
+      response_ms INTEGER DEFAULT 0,
+      coins_earned INTEGER DEFAULT 0,
+      xp_earned INTEGER DEFAULT 0,
+      answered_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_answer_log_user_subtopic
+      ON answer_log(user_id, subtopic_id);
+
+    CREATE TABLE IF NOT EXISTS game_metadata (
+      game_id TEXT PRIMARY KEY,
+      engine_type TEXT NOT NULL CHECK(engine_type IN ('2d', '3d')),
+      max_vertices INTEGER,
+      has_low_poly_mode INTEGER DEFAULT 0,
+      min_tier TEXT NOT NULL DEFAULT 'low' CHECK(min_tier IN ('low', 'mid', 'high')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // Migration: add scene_data column if DB already existed

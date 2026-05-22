@@ -78,6 +78,47 @@ export interface TerrainLayer {
  * Voxel terrain component — chunk-based voxel grid with Marching Cubes meshing.
  * Replaces the heightmap-based TerrainComponent when useVoxelTerrain is enabled.
  */
+/**
+ * Sprite component — 2D visual representation.
+ */
+export class SpriteComponent extends Component {
+  readonly type = 'sprite';
+  textureUrl = '';
+  width = 32;
+  height = 32;
+  anchor = { x: 0.5, y: 0.5 };
+  tint = 0xffffff;
+}
+
+/**
+ * Tilemap component — 2D tile grid.
+ */
+export class TilemapComponent extends Component {
+  readonly type = 'tilemap';
+  tileWidth = 32;
+  tileHeight = 32;
+  columns = 16;
+  rows = 16;
+  /** Flat array of tile IDs (0 = empty). */
+  tiles: number[] = [];
+  /** Map of tile ID → texture URL. */
+  tileTextures: Record<number, string> = {};
+}
+
+/**
+ * Shape2D component — basic 2D primitives for physics sims.
+ */
+export class Shape2DComponent extends Component {
+  readonly type = 'shape2d';
+  shape: 'rect' | 'circle' | 'polygon' = 'rect';
+  color = 0x4a7c3f;
+  width = 32;
+  height = 32;
+  radius = 16;
+  /** For polygon: array of [x, y] pairs. */
+  vertices: [number, number][] = [];
+}
+
 export class VoxelTerrainComponent extends Component {
   readonly type = 'voxel-terrain';
   /** Whether the voxel terrain system is active */

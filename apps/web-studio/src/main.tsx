@@ -3,9 +3,9 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import { App } from './App';
 
-// Kill ALL default wheel/gesture behavior — capture phase runs before anything else
+// Block ctrl/cmd+scroll browser zoom only — don't touch regular scroll so panels can scroll
 window.addEventListener('wheel', (e) => {
-  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) e.preventDefault();
 }, { passive: false, capture: true });
 
 // Prevent Safari pinch-to-zoom and swipe-to-navigate gestures

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useThemeEffect } from '@/hooks/useThemeEffect';
 import { TopMenuBar } from './TopMenuBar';
 import { LeftPanel, LeftPanelToggle } from './LeftPanel';
 import { ViewportThree } from './ViewportThree';
@@ -9,6 +10,7 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { AIToolPanel } from './AIToolPanel';
 import { ScriptEditor } from './ScriptEditor';
 import { TerminalPanel } from './Terminal';
+import { ModeSelector } from './ModeSelector';
 import { useStudio } from '@/store/studio-store';
 
 /**
@@ -24,7 +26,11 @@ import { useStudio } from '@/store/studio-store';
  * └──────────┴────────────────────────────┴─────────────┘
  */
 export function StudioLayout() {
-  const { marketplaceOpen, viewportMode, selectedAITool, leftPanelActiveGroup } = useStudio();
+  useThemeEffect();
+  const { gameMode, marketplaceOpen, viewportMode, selectedAITool, leftPanelActiveGroup } = useStudio();
+
+  // Show mode selector if no game mode is chosen yet
+  if (!gameMode) return <ModeSelector />;
   const showAIPanel = leftPanelActiveGroup === 'create';
   const [bottomTab, setBottomTab] = useState<'playground' | 'script' | 'terminal'>('playground');
   const [terminalFullscreen, setTerminalFullscreen] = useState(false);

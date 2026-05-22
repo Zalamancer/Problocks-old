@@ -23,7 +23,7 @@ import {
   Map,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useStudio, type LeftPanelGroup, type LeftPanelTab } from '@/store/studio-store';
+import { useStudio, MODE_PANELS, type LeftPanelGroup, type LeftPanelTab } from '@/store/studio-store';
 import { ExplorerPanel } from './ExplorerPanel';
 import { TilemapEditor } from './TilemapEditor';
 import { AssetBrowser } from './AssetBrowser';
@@ -216,12 +216,16 @@ function AssetsPanel() {
 // ── Main group header with prev/next chevrons ─────────────────────────
 
 function MainGroupHeader() {
-  const { leftPanelActiveGroup, setLeftPanelGroup } = useStudio();
+  const { leftPanelActiveGroup, setLeftPanelGroup, gameMode } = useStudio();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const currentIndex = TAB_GROUPS.findIndex((g) => g.id === leftPanelActiveGroup);
-  const groupDef = TAB_GROUPS[currentIndex];
+  // Filter tab groups based on game mode
+  const allowedPanels = gameMode ? MODE_PANELS[gameMode] : TAB_GROUPS.map(g => g.id);
+  const filteredGroups = TAB_GROUPS.filter(g => allowedPanels.includes(g.id));
+
+  const currentIndex = filteredGroups.findIndex((g) => g.id === leftPanelActiveGroup);
+  const groupDef = filteredGroups[currentIndex];
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -235,14 +239,14 @@ function MainGroupHeader() {
   }, [dropdownOpen]);
 
   const goPrev = useCallback(() => {
-    const prev = currentIndex <= 0 ? TAB_GROUPS.length - 1 : currentIndex - 1;
-    setLeftPanelGroup(TAB_GROUPS[prev].id);
-  }, [currentIndex, setLeftPanelGroup]);
+    const prev = currentIndex <= 0 ? filteredGroups.length - 1 : currentIndex - 1;
+    setLeftPanelGroup(filteredGroups[prev].id);
+  }, [currentIndex, setLeftPanelGroup, filteredGroups]);
 
   const goNext = useCallback(() => {
-    const next = currentIndex >= TAB_GROUPS.length - 1 ? 0 : currentIndex + 1;
-    setLeftPanelGroup(TAB_GROUPS[next].id);
-  }, [currentIndex, setLeftPanelGroup]);
+    const next = currentIndex >= filteredGroups.length - 1 ? 0 : currentIndex + 1;
+    setLeftPanelGroup(filteredGroups[next].id);
+  }, [currentIndex, setLeftPanelGroup, filteredGroups]);
 
   if (!groupDef) return null;
   const GroupIcon = groupDef.icon;
@@ -273,7 +277,7 @@ function MainGroupHeader() {
 
         {dropdownOpen && (
           <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-zinc-800 border border-white/10 rounded-xl shadow-2xl py-1.5 max-h-[320px] overflow-y-auto">
-            {TAB_GROUPS.map((group) => {
+            {filteredGroups.map((group) => {
               const Icon = group.icon;
               const isActive = group.id === leftPanelActiveGroup;
               return (

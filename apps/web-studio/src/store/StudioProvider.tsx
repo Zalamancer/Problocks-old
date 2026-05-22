@@ -1,13 +1,23 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { StudioContext, DEFAULT_ENTITIES, type EntityData, type LeftPanelGroup, type LeftPanelTab, type ViewportMode, type TilemapTool, type TilesetInfo, type AssetFilter, type HexBrushShape, type HexPaletteTile, type HexMapData } from './studio-store';
+import { StudioContext, DEFAULT_ENTITIES, MODE_PANELS, type EntityData, type GameMode, type LeftPanelGroup, type LeftPanelTab, type ViewportMode, type TilemapTool, type TilesetInfo, type AssetFilter, type HexBrushShape, type HexPaletteTile, type HexMapData, type Theme } from './studio-store';
 import type { TilemapConfig } from '@problocks/engine';
 import type { AssetEntry } from '@problocks/engine';
-import { saveScene, loadScene, clearScene } from './storage';
+import { saveScene, loadScene, clearScene, saveGameMode, loadGameMode, clearGameMode } from './storage';
 import type { SimulationLoop } from '@problocks/engine/core/simulation-loop';
 import type { QuickJSRuntime } from '@problocks/engine/scripting/quickjs-runtime';
 import type { Grid } from '@problocks/engine';
 
 export function StudioProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeRaw] = useState<Theme>(() => (localStorage.getItem('pb-theme') as Theme) ?? 'dark');
+  const toggleTheme = useCallback(() => {
+    setThemeRaw(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('pb-theme', next);
+      return next;
+    });
+  }, []);
+
+  const [gameMode, setGameModeRaw] = useState<GameMode | null>(() => loadGameMode());
   const [entities, setEntities] = useState<EntityData[]>(() => loadScene() ?? DEFAULT_ENTITIES);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>('ball');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -16,9 +26,36 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [scriptCode, setScriptCode] = useState('');
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
-  const [leftPanelActiveGroup, setLeftPanelActiveGroup] = useState<LeftPanelGroup>('scene');
-  const [leftPanelActiveTab, setLeftPanelActiveTab] = useState<LeftPanelTab>('scene');
-  const [viewportMode, setViewportMode] = useState<ViewportMode>('3d');
+  const [leftPanelActiveGroup, setLeftPanelActiveGroup] = useState<LeftPanelGroup>(() => {
+    const mode = loadGameMode();
+    if (!mode) return 'scene';
+    return MODE_PANELS[mode][0];
+  });
+  const [leftPanelActiveTab, setLeftPanelActiveTab] = useState<LeftPanelTab>(() => {
+    const mode = loadGameMode();
+    if (!mode) return 'scene';
+    return MODE_PANELS[mode][0] as LeftPanelTab;
+  });
+  const [viewportMode, setViewportMode] = useState<ViewportMode>(() => {
+    const mode = loadGameMode();
+    if (!mode) return '3d';
+    if (mode === '2d') return '2d';
+    if (mode === '3d' || mode === 'cubes') return '3d';
+    return 'tilemap'; // hex, isometric
+  });
+
+  const setGameMode = useCallback((mode: GameMode) => {
+    setGameModeRaw(mode);
+    saveGameMode(mode);
+    // Set viewport mode based on game mode
+    if (mode === '2d') setViewportMode('2d');
+    else if (mode === '3d' || mode === 'cubes') setViewportMode('3d');
+    else setViewportMode('tilemap'); // hex, isometric
+    // Set default panel for the mode
+    const defaultPanel = MODE_PANELS[mode][0];
+    setLeftPanelActiveGroup(defaultPanel);
+    setLeftPanelActiveTab(defaultPanel as LeftPanelTab);
+  }, []);
 
   // Tilemap state
   const [tilemapConfig, setTilemapConfigRaw] = useState<TilemapConfig | null>(null);
@@ -162,6 +199,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const resetScene = useCallback(() => {
     clearScene();
+    clearGameMode();
+    setGameModeRaw(null);
     setEntities(DEFAULT_ENTITIES);
     setSelectedEntityId(null);
   }, []);
@@ -389,7 +428,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = {
-    gameMode: null as null,
+    theme,
+    toggleTheme,
+    gameMode,
+    setGameMode,
     entities,
     selectedEntityId,
     isPlaying,

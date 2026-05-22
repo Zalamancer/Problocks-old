@@ -1,7 +1,8 @@
-import type { EntityData } from './studio-store';
+import type { EntityData, GameMode } from './studio-store';
 
 const SCENE_KEY = 'problocks:scene';
 const PRESETS_KEY = 'problocks:terrain-presets';
+const GAME_MODE_KEY = 'problocks:game-mode';
 
 export interface TerrainPreset {
   name: string;
@@ -35,6 +36,22 @@ export function loadScene(): EntityData[] | null {
 
 export function clearScene(): void {
   localStorage.removeItem(SCENE_KEY);
+}
+
+export function saveGameMode(mode: GameMode): void {
+  try { localStorage.setItem(GAME_MODE_KEY, mode); } catch { /* quota */ }
+}
+
+export function loadGameMode(): GameMode | null {
+  try {
+    const raw = localStorage.getItem(GAME_MODE_KEY);
+    if (raw && ['2d', '3d', 'hex', 'isometric', 'cubes'].includes(raw)) return raw as GameMode;
+    return null;
+  } catch { return null; }
+}
+
+export function clearGameMode(): void {
+  localStorage.removeItem(GAME_MODE_KEY);
 }
 
 export function getTerrainPresets(): TerrainPreset[] {

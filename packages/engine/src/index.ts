@@ -73,6 +73,15 @@ export * from './placement/index.js';
 // AI — behavior trees, FSM, presets
 export * from './ai/index.js';
 
+// NPC system
+export * from './npc/index.js';
+
+// 2D player controller
+export * from './player/index.js';
+
+// Platform detection (hardware tiers)
+export * from './platform/index.js';
+
 // Scripting API extensions
 export { registerAPIExtensions } from './scripting/api-extensions.js';
 export type { APIExtensionDeps } from './scripting/api-extensions.js';
